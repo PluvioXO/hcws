@@ -211,7 +211,7 @@ If you use this code, please cite:
   title={Hyper-Conceptor Weighted Steering for Large Language Models},
   author={[Authors]},
   journal={[Journal]},
-  year={2024}
+  year={2025}
 }
 ```
 
