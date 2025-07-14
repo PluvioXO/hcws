@@ -1,0 +1,125 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# MacOS
+.DS_Store
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Model checkpoints and data
+*.ckpt
+*.pth
+*.pt
+*.h5
+*.onnx
+*.pb
+*.tflite
+*.npz
+*.npy
+*.joblib
+*.pkl
+*.mlmodel
+*.log
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.sqlite3
+*.db
+*.log
+*.out
+*.weights
+*.onnx
+*.bin
+*.tar.gz
+*.zip
+*.tar
+*.gz
+*.bz2
+*.7z
+*.rar
+
+# HuggingFace transformers cache
+.cache/
+transformers_cache/
+
+# Output files
+*.out
+*.tmp
+*.temp
+
+# Misc
+*.swp
+*.swo
+*~
+
+# Ignore local notebooks and experiment logs
+notebooks/
+logs/ 
