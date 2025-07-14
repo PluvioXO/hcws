@@ -10,6 +10,7 @@ from .encoder import InstructionEncoder
 from .hyper_network import HyperNetwork
 from .conceptors import Conceptor, ConceptorBank
 from .controller import SteeringController
+from .actadd import ActAddModel
 
 __version__ = "0.1.0"
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "HyperNetwork",
     "Conceptor",
     "ConceptorBank",
-    "SteeringController"
+    "SteeringController",
+    "ActAddModel"
 ] 

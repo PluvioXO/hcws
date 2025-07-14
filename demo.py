@@ -1,41 +1,49 @@
 #!/usr/bin/env python3
 """
-Simple demonstration of HCWS functionality.
+HCWS Demo Script
 
-This script provides a quick way to test the HCWS system with basic examples.
+This script demonstrates the Hyper-Conceptor Weighted Steering (HCWS) method
+for controlling language model behavior during inference.
 """
 
 import torch
 import logging
-from hcws import HCWSModel
+from hcws import HCWSModel, ActAddModel
 
-# Set up logging to only show errors
-logging.basicConfig(level=logging.ERROR)
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def print_section(title):
+def print_section(title: str):
     """Print a formatted section header."""
-    print(f"\n{'='*60}")
-    print(f"{title:^60}")
-    print(f"{'='*60}")
+    print(f"\n{'='*20} {title} {'='*20}")
 
 
-def print_comparison(prompt, unsteered, steered, instruction, strength=None):
-    """Print a clean comparison between unsteered and steered outputs."""
-    print(f"\n📝 Prompt: {prompt}")
+def print_comparison(prompt: str, unsteered: str, steered: str, instruction: str, strength: float):
+    """Print a formatted comparison between unsteered and steered outputs."""
+    print(f"📝 Prompt: {prompt}")
     print(f"🎯 Instruction: {instruction}")
-    if strength:
-        print(f"⚡ Steering Strength: {strength}")
-    print(f"\n🔹 Unsteered: {unsteered}")
-    print(f"🎭 Steered:    {steered}")
+    print(f"⚡ Strength: {strength}")
+    print(f"🔹 Unsteered: {unsteered}")
+    print(f"🎮 Steered: {steered}")
+    print("-" * 60)
+
+
+def print_method_comparison(prompt: str, hcws_output: str, actadd_output: str, instruction: str, behavior: str):
+    """Print a formatted comparison between HCWS and ActAdd methods."""
+    print(f"📝 Prompt: {prompt}")
+    print(f"🎯 Instruction: {instruction}")
+    print(f"🎭 Behavior: {behavior}")
+    print(f"🧠 HCWS: {hcws_output}")
+    print(f"➕ ActAdd: {actadd_output}")
     print("-" * 60)
 
 
 def main():
-    """Run a simple HCWS demonstration."""
+    """Run a comprehensive HCWS and ActAdd demonstration."""
     
-    print("🚀 HCWS (Hyper-Conceptor Weighted Steering) Demo")
+    print("🚀 HCWS vs ActAdd Steering Demo")
     print("=" * 60)
     
     # Check if CUDA is available
@@ -43,44 +51,114 @@ def main():
     print(f"💻 Using device: {device}")
     
     try:
-        # Initialize HCWS model with default steering strength
-        print("\n🔄 Initializing HCWS model with GPT-2...")
-        model = HCWSModel("gpt2", device=device, steering_strength=5.0)
-        print("✅ Model loaded successfully")
+        # Initialize both models
+        print("\n🔄 Initializing models...")
+        hcws_model = HCWSModel("gpt2", device=device, steering_strength=5.0)
+        actadd_model = ActAddModel("gpt2", device=device, steering_strength=5.0)
+        print("✅ Models loaded successfully")
         
-        # Test basic generation
-        print_section("BASIC GENERATION TEST")
+        # Test basic generation comparison
+        print_section("BASIC GENERATION COMPARISON")
         
         prompt = "The future of artificial intelligence is"
+        instruction = "be optimistic and enthusiastic"
+        behavior = "optimistic"
         
-        # Generate without steering
-        unsteered_output = model.generate(
+        # Generate unsteered version
+        unsteered_output = hcws_model.generate(
             prompt,
             max_length=30,
             temperature=0.8,
             do_sample=True
         )
         
-        # Generate with steering
-        steering_instruction = "be optimistic and enthusiastic"
-        steered_output = model.generate(
+        # Generate with HCWS
+        hcws_output = hcws_model.generate(
             prompt,
-            steering_instruction=steering_instruction,
+            steering_instruction=instruction,
             max_length=30,
             temperature=0.8,
             do_sample=True
         )
         
-        print_comparison(prompt, unsteered_output, steered_output, steering_instruction, 5.0)
+        # Generate with ActAdd
+        actadd_output = actadd_model.generate(
+            prompt,
+            behavior=behavior,
+            max_length=30,
+            temperature=0.8,
+            do_sample=True
+        )
         
-        # Test different steering strengths
+        print(f"📝 Prompt: {prompt}")
+        print(f"🎯 Instruction: {instruction}")
+        print(f"🔹 Unsteered: {unsteered_output}")
+        print(f"🧠 HCWS: {hcws_output}")
+        print(f"➕ ActAdd: {actadd_output}")
+        print("-" * 60)
+        
+        # Test different behaviors/styles
+        print_section("MULTIPLE BEHAVIOR COMPARISON")
+        
+        test_cases = [
+            {
+                "prompt": "The weather today is",
+                "instruction": "be cheerful and upbeat",
+                "behavior": "optimistic"
+            },
+            {
+                "prompt": "The economic situation is",
+                "instruction": "be pessimistic and gloomy",
+                "behavior": "pessimistic"
+            },
+            {
+                "prompt": "The scientific discovery shows",
+                "instruction": "be formal and precise",
+                "behavior": "formal"
+            },
+            {
+                "prompt": "The party was",
+                "instruction": "be casual and relaxed",
+                "behavior": "casual"
+            }
+        ]
+        
+        for i, case in enumerate(test_cases, 1):
+            print(f"\n🔸 Test Case {i}:")
+            
+            # Generate with HCWS
+            hcws_output = hcws_model.generate(
+                case["prompt"],
+                steering_instruction=case["instruction"],
+                max_length=25,
+                temperature=0.7
+            )
+            
+            # Generate with ActAdd
+            actadd_output = actadd_model.generate(
+                case["prompt"],
+                behavior=case["behavior"],
+                max_length=25,
+                temperature=0.7
+            )
+            
+            print_method_comparison(
+                case["prompt"],
+                hcws_output,
+                actadd_output,
+                case["instruction"],
+                case["behavior"]
+            )
+        
+        # Test steering strength comparison
         print_section("STEERING STRENGTH COMPARISON")
         
-        test_prompt = "The weather today is"
-        instruction = "be cheerful and upbeat"
+        test_prompt = "The new technology will"
+        instruction = "be creative and innovative"
+        behavior = "creative"
         
-        # Generate unsteered version first
-        unsteered_output = model.generate(
+        # Generate unsteered version
+        unsteered_output = hcws_model.generate(
             test_prompt,
             max_length=25,
             temperature=0.7
@@ -95,59 +173,87 @@ def main():
         strengths = [1.0, 3.0, 5.0, 8.0]
         
         for strength in strengths:
-            # Create new model with different steering strength
-            model_strength = HCWSModel("gpt2", device=device, steering_strength=strength)
+            # Update steering strength for both models
+            hcws_model.steering_strength = strength
+            actadd_model.steering_strength = strength
             
-            steered_output = model_strength.generate(
+            # Generate with HCWS
+            hcws_output = hcws_model.generate(
                 test_prompt,
                 steering_instruction=instruction,
                 max_length=25,
                 temperature=0.7
             )
             
-            print(f"⚡ Strength {strength}: {steered_output}")
+            # Generate with ActAdd
+            actadd_output = actadd_model.generate(
+                test_prompt,
+                behavior=behavior,
+                max_length=25,
+                temperature=0.7
+            )
+            
+            print(f"⚡ Strength: {strength}")
+            print(f"🧠 HCWS: {hcws_output}")
+            print(f"➕ ActAdd: {actadd_output}")
+            print("-" * 40)
         
-        # Test different steering instructions
-        print_section("MULTIPLE STEERING INSTRUCTIONS")
+        # Test available ActAdd behaviors
+        print_section("AVAILABLE ACTADD BEHAVIORS")
         
-        instructions = [
-            "be poetic and metaphorical",
-            "be scientific and precise", 
-            "be negative and gloomy",
-            "be cheerful and upbeat"
+        available_behaviors = actadd_model.get_available_behaviors()
+        print(f"🎭 Available behaviors: {', '.join(available_behaviors)}")
+        
+        # Test a few more behaviors
+        additional_tests = [
+            {
+                "prompt": "The poem describes",
+                "instruction": "be poetic and metaphorical",
+                "behavior": "poetic"
+            },
+            {
+                "prompt": "The research indicates",
+                "instruction": "be scientific and analytical",
+                "behavior": "scientific"
+            }
         ]
         
-        # Generate each steered version
-        for i, instruction in enumerate(instructions, 1):
-            steered_output = model.generate(
-                test_prompt,
-                steering_instruction=instruction,
+        for case in additional_tests:
+            print(f"\n🔸 Testing {case['behavior']} behavior:")
+            
+            hcws_output = hcws_model.generate(
+                case["prompt"],
+                steering_instruction=case["instruction"],
                 max_length=25,
                 temperature=0.7
             )
-            print(f"{i}. 🎯 '{instruction}':")
-            print(f"   🎭 {steered_output}")
-            print()
+            
+            actadd_output = actadd_model.generate(
+                case["prompt"],
+                behavior=case["behavior"],
+                max_length=25,
+                temperature=0.7
+            )
+            
+            print_method_comparison(
+                case["prompt"],
+                hcws_output,
+                actadd_output,
+                case["instruction"],
+                case["behavior"]
+            )
         
-        # Test steering strength analysis
-        print_section("STEERING STRENGTH ANALYSIS")
-        
-        for instruction in instructions:
-            metrics = model.compute_steering_strength(instruction)
-            print(f"🎯 '{instruction}':")
-            print(f"   📊 Mean aperture: {metrics['mean_aperture']:.4f}")
-            print(f"   📈 Aperture std:   {metrics['aperture_std']:.4f}")
-            print()
-        
-        print("✅ Demo completed successfully!")
+        print_section("DEMO COMPLETE")
+        print("✅ Successfully demonstrated both HCWS and ActAdd steering methods!")
+        print("📊 Key differences:")
+        print("   • HCWS: Uses conceptor-based subspace steering")
+        print("   • ActAdd: Uses direct activation vector addition")
+        print("   • Both methods provide effective steering control")
         
     except Exception as e:
-        logger.error(f"Error during demo: {e}")
-        print(f"❌ Demo failed with error: {e}")
-        return 1
-    
-    return 0
+        print(f"❌ Error during demo: {e}")
+        logger.error(f"Demo failed: {e}", exc_info=True)
 
 
 if __name__ == "__main__":
-    exit(main()) 
+    main() 
