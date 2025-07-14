@@ -21,10 +21,12 @@ def print_section(title):
     print(f"{'='*60}")
 
 
-def print_comparison(prompt, unsteered, steered, instruction):
+def print_comparison(prompt, unsteered, steered, instruction, strength=None):
     """Print a clean comparison between unsteered and steered outputs."""
     print(f"\n📝 Prompt: {prompt}")
     print(f"🎯 Instruction: {instruction}")
+    if strength:
+        print(f"⚡ Steering Strength: {strength}")
     print(f"\n🔹 Unsteered: {unsteered}")
     print(f"🎭 Steered:    {steered}")
     print("-" * 60)
@@ -41,9 +43,9 @@ def main():
     print(f"💻 Using device: {device}")
     
     try:
-        # Initialize HCWS model
+        # Initialize HCWS model with default steering strength
         print("\n🔄 Initializing HCWS model with GPT-2...")
-        model = HCWSModel("gpt2", device=device)
+        model = HCWSModel("gpt2", device=device, steering_strength=5.0)
         print("✅ Model loaded successfully")
         
         # Test basic generation
@@ -69,18 +71,13 @@ def main():
             do_sample=True
         )
         
-        print_comparison(prompt, unsteered_output, steered_output, steering_instruction)
+        print_comparison(prompt, unsteered_output, steered_output, steering_instruction, 5.0)
         
-        # Test different steering instructions
-        print_section("MULTIPLE STEERING INSTRUCTIONS")
+        # Test different steering strengths
+        print_section("STEERING STRENGTH COMPARISON")
         
         test_prompt = "The weather today is"
-        instructions = [
-            "be poetic and metaphorical",
-            "be scientific and precise", 
-            "be negative and gloomy",
-            "be cheerful and upbeat"
-        ]
+        instruction = "be cheerful and upbeat"
         
         # Generate unsteered version first
         unsteered_output = model.generate(
@@ -90,8 +87,35 @@ def main():
         )
         
         print(f"📝 Prompt: {test_prompt}")
+        print(f"🎯 Instruction: {instruction}")
         print(f"🔹 Unsteered: {unsteered_output}")
         print("-" * 60)
+        
+        # Test different steering strengths
+        strengths = [1.0, 3.0, 5.0, 8.0]
+        
+        for strength in strengths:
+            # Create new model with different steering strength
+            model_strength = HCWSModel("gpt2", device=device, steering_strength=strength)
+            
+            steered_output = model_strength.generate(
+                test_prompt,
+                steering_instruction=instruction,
+                max_length=25,
+                temperature=0.7
+            )
+            
+            print(f"⚡ Strength {strength}: {steered_output}")
+        
+        # Test different steering instructions
+        print_section("MULTIPLE STEERING INSTRUCTIONS")
+        
+        instructions = [
+            "be poetic and metaphorical",
+            "be scientific and precise", 
+            "be negative and gloomy",
+            "be cheerful and upbeat"
+        ]
         
         # Generate each steered version
         for i, instruction in enumerate(instructions, 1):

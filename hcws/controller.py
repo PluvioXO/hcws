@@ -28,6 +28,7 @@ class SteeringController(nn.Module):
         hidden_dim: int,
         num_layers: int,
         controller_dim: int = 128,
+        steering_strength: float = 1.0,
         use_attention: bool = True,
         use_temporal_smoothing: bool = True,
         smoothing_factor: float = 0.9,
@@ -40,6 +41,7 @@ class SteeringController(nn.Module):
             hidden_dim: Hidden dimension of the target model
             num_layers: Number of layers in the target model
             controller_dim: Internal dimension of the controller
+            steering_strength: Multiplier for steering intensity (default: 1.0)
             use_attention: Whether to use attention mechanism
             use_temporal_smoothing: Whether to smooth gains over time
             smoothing_factor: Smoothing factor for temporal smoothing
@@ -50,6 +52,7 @@ class SteeringController(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.controller_dim = controller_dim
+        self.steering_strength = steering_strength
         self.use_attention = use_attention
         self.use_temporal_smoothing = use_temporal_smoothing
         self.smoothing_factor = smoothing_factor
@@ -141,10 +144,10 @@ class SteeringController(nn.Module):
         
         # Generate gain and weights
         gain_raw = self.gain_head(controller_output)  # [batch_size, 1]
-        gain = torch.sigmoid(gain_raw) * 5.0  # Scale up gain to [0, 5] range
+        gain = torch.sigmoid(gain_raw) * self.steering_strength  # Scale up gain to [0, 5] range
         
         weight_raw = self.weight_head(controller_output)  # [batch_size, num_layers]
-        layer_weights = torch.softmax(weight_raw, dim=1) * 2.0  # Scale up weights to [0, 2] range
+        layer_weights = torch.softmax(weight_raw, dim=1) * self.steering_strength  # Scale up weights to [0, 2] range
         
         # Apply temporal smoothing if enabled
         if self.use_temporal_smoothing and self.training:

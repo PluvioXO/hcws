@@ -39,6 +39,7 @@ class HCWSModel(nn.Module):
         controller_dim: int = 128,
         steering_layers: Optional[List[int]] = None,
         hook_frequency: int = 4,
+        steering_strength: float = 1.0,
         device: Optional[str] = None
     ):
         """
@@ -51,6 +52,7 @@ class HCWSModel(nn.Module):
             controller_dim: Controller hidden dimension
             steering_layers: List of layers to apply steering (None for all)
             hook_frequency: Apply steering every N tokens
+            steering_strength: Multiplier for steering intensity (default: 1.0)
             device: Device to run computations on
         """
         super().__init__()
@@ -58,6 +60,7 @@ class HCWSModel(nn.Module):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.hook_frequency = hook_frequency
         self.steering_layers = steering_layers
+        self.steering_strength = steering_strength
         
         # Load base model and tokenizer
         self.base_model = AutoModelForCausalLM.from_pretrained(model_name_or_path)
@@ -93,6 +96,7 @@ class HCWSModel(nn.Module):
             hidden_dim=self.hidden_dim,
             num_layers=self.num_layers,
             controller_dim=controller_dim,
+            steering_strength=steering_strength,
             device=self.device
         )
         
@@ -107,6 +111,7 @@ class HCWSModel(nn.Module):
         
         logger.info(f"Initialized HCWS model with base model: {model_name_or_path}")
         logger.info(f"Hidden dim: {self.hidden_dim}, Num layers: {self.num_layers}")
+        logger.info(f"Steering strength: {steering_strength}")
     
     def _get_model_layers(self):
         """Get the transformer layers from the base model."""
