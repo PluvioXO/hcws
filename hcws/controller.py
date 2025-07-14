@@ -141,10 +141,10 @@ class SteeringController(nn.Module):
         
         # Generate gain and weights
         gain_raw = self.gain_head(controller_output)  # [batch_size, 1]
-        gain = torch.sigmoid(gain_raw)  # Ensure gain ∈ [0, 1]
+        gain = torch.sigmoid(gain_raw) * 5.0  # Scale up gain to [0, 5] range
         
         weight_raw = self.weight_head(controller_output)  # [batch_size, num_layers]
-        layer_weights = torch.softmax(weight_raw, dim=1)  # Normalize weights
+        layer_weights = torch.softmax(weight_raw, dim=1) * 2.0  # Scale up weights to [0, 2] range
         
         # Apply temporal smoothing if enabled
         if self.use_temporal_smoothing and self.training:

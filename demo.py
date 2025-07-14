@@ -9,43 +9,55 @@ import torch
 import logging
 from hcws import HCWSModel
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging to only show errors
+logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
+
+
+def print_section(title):
+    """Print a formatted section header."""
+    print(f"\n{'='*60}")
+    print(f"{title:^60}")
+    print(f"{'='*60}")
+
+
+def print_comparison(prompt, unsteered, steered, instruction):
+    """Print a clean comparison between unsteered and steered outputs."""
+    print(f"\n📝 Prompt: {prompt}")
+    print(f"🎯 Instruction: {instruction}")
+    print(f"\n🔹 Unsteered: {unsteered}")
+    print(f"🎭 Steered:    {steered}")
+    print("-" * 60)
 
 
 def main():
     """Run a simple HCWS demonstration."""
     
-    print("HCWS (Hyper-Conceptor Weighted Steering) Demo")
-    print("=" * 50)
+    print("🚀 HCWS (Hyper-Conceptor Weighted Steering) Demo")
+    print("=" * 60)
     
     # Check if CUDA is available
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+    print(f"💻 Using device: {device}")
     
     try:
         # Initialize HCWS model
-        print("\nInitializing HCWS model with GPT-2...")
+        print("\n🔄 Initializing HCWS model with GPT-2...")
         model = HCWSModel("gpt2", device=device)
-        print("✓ Model loaded successfully")
+        print("✅ Model loaded successfully")
         
         # Test basic generation
-        print("\n" + "=" * 50)
-        print("BASIC GENERATION TEST")
-        print("=" * 50)
+        print_section("BASIC GENERATION TEST")
         
         prompt = "The future of artificial intelligence is"
-        print(f"Input: {prompt}")
         
         # Generate without steering
-        normal_output = model.generate(
+        unsteered_output = model.generate(
             prompt,
             max_length=30,
             temperature=0.8,
             do_sample=True
         )
-        print(f"Normal: {normal_output}")
         
         # Generate with steering
         steering_instruction = "be optimistic and enthusiastic"
@@ -56,46 +68,54 @@ def main():
             temperature=0.8,
             do_sample=True
         )
-        print(f"Steered ('{steering_instruction}'): {steered_output}")
+        
+        print_comparison(prompt, unsteered_output, steered_output, steering_instruction)
         
         # Test different steering instructions
-        print("\n" + "=" * 50)
-        print("MULTIPLE STEERING INSTRUCTIONS")
-        print("=" * 50)
+        print_section("MULTIPLE STEERING INSTRUCTIONS")
         
         test_prompt = "The weather today is"
         instructions = [
             "be poetic and metaphorical",
-            "be scientific and precise",
+            "be scientific and precise", 
             "be negative and gloomy",
             "be cheerful and upbeat"
         ]
         
-        print(f"Input: {test_prompt}")
-        print()
+        # Generate unsteered version first
+        unsteered_output = model.generate(
+            test_prompt,
+            max_length=25,
+            temperature=0.7
+        )
         
-        for instruction in instructions:
-            output = model.generate(
+        print(f"📝 Prompt: {test_prompt}")
+        print(f"🔹 Unsteered: {unsteered_output}")
+        print("-" * 60)
+        
+        # Generate each steered version
+        for i, instruction in enumerate(instructions, 1):
+            steered_output = model.generate(
                 test_prompt,
                 steering_instruction=instruction,
                 max_length=25,
                 temperature=0.7
             )
-            print(f"'{instruction}': {output}")
+            print(f"{i}. 🎯 '{instruction}':")
+            print(f"   🎭 {steered_output}")
+            print()
         
         # Test steering strength analysis
-        print("\n" + "=" * 50)
-        print("STEERING STRENGTH ANALYSIS")
-        print("=" * 50)
+        print_section("STEERING STRENGTH ANALYSIS")
         
         for instruction in instructions:
             metrics = model.compute_steering_strength(instruction)
-            print(f"'{instruction}':")
-            print(f"  Mean aperture: {metrics['mean_aperture']:.4f}")
-            print(f"  Aperture std: {metrics['aperture_std']:.4f}")
+            print(f"🎯 '{instruction}':")
+            print(f"   📊 Mean aperture: {metrics['mean_aperture']:.4f}")
+            print(f"   📈 Aperture std:   {metrics['aperture_std']:.4f}")
             print()
         
-        print("✓ Demo completed successfully!")
+        print("✅ Demo completed successfully!")
         
     except Exception as e:
         logger.error(f"Error during demo: {e}")

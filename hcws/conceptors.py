@@ -48,7 +48,7 @@ class Conceptor(nn.Module):
         
         # Initialize U and s parameters
         self.U = nn.Parameter(torch.randn(hidden_dim, rank, device=self.device))
-        self.s = nn.Parameter(torch.ones(rank, device=self.device))
+        self.s = nn.Parameter(torch.ones(rank, device=self.device) * 0.1)  # Start with smaller values
         
         # Initialize U with orthogonal columns
         self._initialize_orthogonal()
@@ -70,8 +70,8 @@ class Conceptor(nn.Module):
         # Ensure U has orthogonal columns
         U_normalized, _ = torch.qr(self.U)
         
-        # Clamp singular values to ensure stability
-        s_clamped = torch.clamp(self.s, min=0.0, max=1.0)
+        # Clamp singular values to ensure stability and reduce aperture
+        s_clamped = torch.clamp(self.s, min=0.0, max=0.5)  # Reduced from 1.0 to 0.5
         
         # Compute C = U diag(s) U^T
         C = torch.mm(U_normalized * s_clamped.unsqueeze(0), U_normalized.t())
