@@ -13,9 +13,11 @@ import logging
 from functools import partial
 
 from .encoder import InstructionEncoder
+from .simple_encoder import SimpleInstructionEncoder
 from .hyper_network import HyperNetwork
 from .conceptors import ConceptorBank
 from .controller import SteeringController
+from .model_registry import get_model_config, detect_model_config, ModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +41,10 @@ class HCWSModel(nn.Module):
         controller_dim: int = 128,
         steering_layers: Optional[List[int]] = None,
         hook_frequency: int = 4,
-        steering_strength: float = 1.0,
-        device: Optional[str] = None
+        steering_strength: Optional[float] = None,
+        device: Optional[str] = None,
+        model_config: Optional[ModelConfig] = None,
+        **model_kwargs
     ):
         """
         Initialize the HCWS model.
@@ -52,37 +56,83 @@ class HCWSModel(nn.Module):
             controller_dim: Controller hidden dimension
             steering_layers: List of layers to apply steering (None for all)
             hook_frequency: Apply steering every N tokens
-            steering_strength: Multiplier for steering intensity (default: 1.0)
+            steering_strength: Multiplier for steering intensity (None for default)
             device: Device to run computations on
+            model_config: Pre-configured model config (None for auto-detection)
+            **model_kwargs: Additional arguments for model loading
         """
         super().__init__()
         
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.hook_frequency = hook_frequency
-        self.steering_layers = steering_layers
+        
+        # Detect or use provided model configuration
+        if model_config is None:
+            model_config = detect_model_config(model_name_or_path)
+        
+        self.model_config = model_config
+        
+        # Set steering strength (use config default if not provided)
+        if steering_strength is None and model_config:
+            steering_strength = model_config.default_steering_strength
+        elif steering_strength is None:
+            steering_strength = 1.0
+        
         self.steering_strength = steering_strength
+        self.steering_layers = steering_layers
+        
+        # Prepare model loading arguments
+        load_kwargs = {}
+        if model_config and model_config.requires_trust_remote_code:
+            load_kwargs['trust_remote_code'] = True
+        if model_config and model_config.torch_dtype:
+            import torch
+            if model_config.torch_dtype == "float16":
+                load_kwargs['torch_dtype'] = torch.float16
+            elif model_config.torch_dtype == "bfloat16":
+                load_kwargs['torch_dtype'] = torch.bfloat16
+        
+        # Add any additional kwargs
+        load_kwargs.update(model_kwargs)
         
         # Load base model and tokenizer
-        self.base_model = AutoModelForCausalLM.from_pretrained(model_name_or_path)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        self.base_model = AutoModelForCausalLM.from_pretrained(model_name_or_path, **load_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, **load_kwargs)
         
         # Add pad token if not present
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        # Get model dimensions
-        self.hidden_dim = self.base_model.config.hidden_size
-        self.num_layers = self.base_model.config.num_hidden_layers
+        # Get model dimensions (use config if available, otherwise detect)
+        if model_config:
+            self.hidden_dim = model_config.hidden_dim
+            self.num_layers = model_config.num_layers
+        else:
+            # Fallback to model config detection
+            self.hidden_dim = self.base_model.config.hidden_size
+            if hasattr(self.base_model.config, 'num_hidden_layers'):
+                self.num_layers = self.base_model.config.num_hidden_layers
+            elif hasattr(self.base_model.config, 'n_layer'):
+                self.num_layers = self.base_model.config.n_layer
+            elif hasattr(self.base_model.config, 'num_layers'):
+                self.num_layers = self.base_model.config.num_layers
+            else:
+                raise ValueError("Could not determine number of layers from model config")
         
         # Set default steering layers
         if steering_layers is None:
             self.steering_layers = list(range(self.num_layers))
         
         # Initialize HCWS components
-        self.instruction_encoder = InstructionEncoder(
-            instruction_encoder_name,
-            device=self.device
-        )
+        try:
+            self.instruction_encoder = InstructionEncoder(
+                instruction_encoder_name,
+                device=self.device
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load T5 encoder: {e}")
+            logger.info("Falling back to simple BERT-based encoder")
+            self.instruction_encoder = SimpleInstructionEncoder(device=self.device)
         
         self.hyper_network = HyperNetwork(
             instruction_dim=self.instruction_encoder.get_embedding_dim(),
@@ -115,14 +165,25 @@ class HCWSModel(nn.Module):
     
     def _get_model_layers(self):
         """Get the transformer layers from the base model."""
-        # This is model-specific and may need adjustment for different architectures
+        # Use model config layer path if available
+        if self.model_config and self.model_config.layer_attr_path:
+            obj = self.base_model
+            for attr in self.model_config.layer_attr_path:
+                obj = getattr(obj, attr)
+            return obj
+        
+        # Fallback to common patterns
         if hasattr(self.base_model, 'transformer'):
             return self.base_model.transformer.h  # GPT-2 style
         elif hasattr(self.base_model, 'model'):
             if hasattr(self.base_model.model, 'layers'):
-                return self.base_model.model.layers  # LLaMA style
+                return self.base_model.model.layers  # LLaMA/Mistral/DeepSeek style
             elif hasattr(self.base_model.model, 'decoder'):
                 return self.base_model.model.decoder.layers  # T5 style
+            elif hasattr(self.base_model.model, 'h'):
+                return self.base_model.model.h  # Some GPT variants
+        elif hasattr(self.base_model, 'layers'):
+            return self.base_model.layers  # Direct layers attribute
         
         raise ValueError("Could not find transformer layers in the model")
     

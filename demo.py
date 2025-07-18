@@ -8,7 +8,8 @@ for controlling language model behavior during inference.
 
 import torch
 import logging
-from hcws import HCWSModel, ActAddModel
+import argparse
+from hcws import HCWSModel, ActAddModel, print_available_models, get_model_config
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -40,21 +41,129 @@ def print_method_comparison(prompt: str, hcws_output: str, actadd_output: str, i
     print("-" * 60)
 
 
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="HCWS Demo - Model Selection")
+    
+    parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default="gpt2",
+        help="Model to use (key from registry or HuggingFace model path)"
+    )
+    
+    parser.add_argument(
+        "--steering-strength", "-s",
+        type=float,
+        default=None,
+        help="Steering strength (default: use model's recommended strength)"
+    )
+    
+    parser.add_argument(
+        "--device", "-d",
+        type=str,
+        default=None,
+        help="Device to use (cuda/cpu, default: auto-detect)"
+    )
+    
+    parser.add_argument(
+        "--list-models", "-l",
+        action="store_true",
+        help="List all available models and exit"
+    )
+    
+    parser.add_argument(
+        "--model-info", "-i",
+        type=str,
+        help="Show detailed info about a specific model"
+    )
+    
+    parser.add_argument(
+        "--trust-remote-code",
+        action="store_true",
+        help="Trust remote code for model loading"
+    )
+    
+    return parser.parse_args()
+
+
 def main():
     """Run a comprehensive HCWS and ActAdd demonstration."""
+    args = parse_args()
+    
+    # Handle list models
+    if args.list_models:
+        print_available_models()
+        return
+    
+    # Handle model info
+    if args.model_info:
+        try:
+            from hcws.model_registry import print_model_info
+            print_model_info(args.model_info)
+        except ValueError as e:
+            print(f"Error: {e}")
+        return
     
     print("🚀 HCWS vs ActAdd Steering Demo")
     print("=" * 60)
     
     # Check if CUDA is available
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     print(f"💻 Using device: {device}")
+    
+    # Get model configuration
+    try:
+        model_config = get_model_config(args.model)
+        print(f"📦 Using predefined model: {model_config.name}")
+        model_path = model_config.model_id
+        
+        # Use config steering strength if not specified
+        steering_strength = args.steering_strength or model_config.default_steering_strength
+        
+    except ValueError:
+        # Not in registry, treat as direct model path
+        print(f"📦 Using custom model: {args.model}")
+        model_path = args.model
+        model_config = None
+        steering_strength = args.steering_strength or 3.0
+    
+    print(f"⚡ Steering strength: {steering_strength}")
+    
+    # Prepare model kwargs
+    model_kwargs = {}
+    if args.trust_remote_code:
+        model_kwargs['trust_remote_code'] = True
     
     try:
         # Initialize both models
         print("\n🔄 Initializing models...")
-        hcws_model = HCWSModel("gpt2", device=device, steering_strength=5.0)
-        actadd_model = ActAddModel("gpt2", device=device, steering_strength=5.0)
+        hcws_model = HCWSModel(
+            model_path, 
+            device=device, 
+            steering_strength=steering_strength,
+            model_config=model_config,
+            **model_kwargs
+        )
+        
+        # For ActAdd, we need to adapt it to work with different models
+        if model_config:
+            actadd_model = ActAddModel(
+                model_path, 
+                hidden_dim=model_config.hidden_dim,
+                num_layers=model_config.num_layers,
+                device=device, 
+                steering_strength=steering_strength,
+                **model_kwargs
+            )
+        else:
+            actadd_model = ActAddModel(
+                model_path, 
+                device=device, 
+                steering_strength=steering_strength,
+                **model_kwargs
+            )
+        
         print("✅ Models loaded successfully")
         
         # Test basic generation comparison

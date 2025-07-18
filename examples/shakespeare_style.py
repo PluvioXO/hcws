@@ -7,13 +7,14 @@ This script demonstrates how to use HCWS to generate text in Shakespearean style
 
 import torch
 import logging
+import argparse
 from pathlib import Path
 import sys
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from hcws import HCWSModel
+from hcws import HCWSModel, print_available_models
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -23,9 +24,18 @@ logger = logging.getLogger(__name__)
 def main():
     """Main function to demonstrate Shakespearean style generation."""
     
-    # Initialize HCWS model with GPT-2
-    print("Loading HCWS model with GPT-2...")
-    model = HCWSModel("gpt2", device="cuda" if torch.cuda.is_available() else "cpu")
+    parser = argparse.ArgumentParser(description="Shakespearean Style Generation with HCWS")
+    parser.add_argument("--model", "-m", default="gpt2", help="Model to use")
+    parser.add_argument("--list-models", "-l", action="store_true", help="List available models")
+    args = parser.parse_args()
+    
+    if args.list_models:
+        print_available_models()
+        return
+    
+    # Initialize HCWS model
+    print(f"Loading HCWS model with {args.model}...")
+    model = HCWSModel(args.model, device="cuda" if torch.cuda.is_available() else "cpu")
     
     # Define input prompts
     prompts = [

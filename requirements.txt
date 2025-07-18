@@ -1,5 +1,6 @@
 torch>=2.0.0
 transformers>=4.30.0
+sentencepiece>=0.1.99
 numpy>=1.21.0
 scipy>=1.7.0
 einops>=0.6.0
