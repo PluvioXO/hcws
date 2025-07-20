@@ -42,7 +42,8 @@ class InstructionEncoder(nn.Module):
         self.model_name = model_name
         self.max_length = max_length
         self.pooling = pooling
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from .device_utils import get_device
+        self.device = get_device(device)
         
         # Load tokenizer and model
         self.tokenizer = T5Tokenizer.from_pretrained(model_name)

@@ -35,7 +35,8 @@ def main():
     
     # Initialize HCWS model
     print(f"Loading HCWS model with {args.model}...")
-    model = HCWSModel(args.model, device="cuda" if torch.cuda.is_available() else "cpu")
+    from hcws.device_utils import get_best_device
+    model = HCWSModel(args.model, device=get_best_device())
     
     # Define input prompts
     prompts = [

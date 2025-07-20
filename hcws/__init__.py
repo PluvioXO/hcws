@@ -19,6 +19,12 @@ from .model_registry import (
     print_available_models,
     detect_model_config
 )
+from .device_utils import (
+    get_best_device,
+    get_device_info,
+    print_device_info,
+    get_device
+)
 
 __version__ = "0.1.0"
 __all__ = [
@@ -34,5 +40,9 @@ __all__ = [
     "get_model_config",
     "list_available_models", 
     "print_available_models",
-    "detect_model_config"
+    "detect_model_config",
+    "get_best_device",
+    "get_device_info", 
+    "print_device_info",
+    "get_device"
 ] 

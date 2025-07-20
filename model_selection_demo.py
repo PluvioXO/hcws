@@ -54,7 +54,8 @@ def demo_model_generation(model_key: str, prompt: str = "The future of AI is"):
         
         # Initialize model
         print("Loading model...")
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        from hcws.device_utils import get_best_device
+        device = get_best_device()
         model = HCWSModel(model_key, device=device)
         print("✅ Model loaded successfully")
         

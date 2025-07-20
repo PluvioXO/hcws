@@ -56,7 +56,8 @@ class SteeringController(nn.Module):
         self.use_attention = use_attention
         self.use_temporal_smoothing = use_temporal_smoothing
         self.smoothing_factor = smoothing_factor
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from .device_utils import get_device
+        self.device = get_device(device)
         
         # Input projection
         self.input_proj = nn.Linear(hidden_dim, controller_dim)

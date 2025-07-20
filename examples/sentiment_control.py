@@ -25,7 +25,8 @@ def main():
     
     # Initialize HCWS model with GPT-2
     print("Loading HCWS model with GPT-2...")
-    model = HCWSModel("gpt2", device="cuda" if torch.cuda.is_available() else "cpu")
+    from hcws.device_utils import get_best_device
+    model = HCWSModel("gpt2", device=get_best_device())
     
     # Define neutral prompts
     neutral_prompts = [

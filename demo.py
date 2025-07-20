@@ -108,9 +108,10 @@ def main():
     print("🚀 HCWS vs ActAdd Steering Demo")
     print("=" * 60)
     
-    # Check if CUDA is available
-    device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"💻 Using device: {device}")
+    # Check best available device
+    from hcws.device_utils import get_device, print_device_info
+    device = get_device(args.device)
+    print_device_info()
     
     # Get model configuration
     try:

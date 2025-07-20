@@ -59,7 +59,8 @@ class HyperNetwork(nn.Module):
         self.conceptor_rank = conceptor_rank
         self.hyper_hidden_dim = hyper_hidden_dim
         self.use_layer_embedding = use_layer_embedding
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from .device_utils import get_device
+        self.device = get_device(device)
         
         # Layer embeddings for layer-specific generation
         if use_layer_embedding:

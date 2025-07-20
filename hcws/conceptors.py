@@ -44,7 +44,8 @@ class Conceptor(nn.Module):
         self.hidden_dim = hidden_dim
         self.rank = rank
         self.regularization = regularization
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from .device_utils import get_device
+        self.device = get_device(device)
         
         # Initialize U and s parameters
         self.U = nn.Parameter(torch.randn(hidden_dim, rank, device=self.device))
@@ -197,7 +198,8 @@ class ConceptorBank(nn.Module):
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.rank = rank
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from .device_utils import get_device
+        self.device = get_device(device)
         
         # Create conceptors for each layer
         self.conceptors = nn.ModuleList([

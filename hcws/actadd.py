@@ -55,7 +55,8 @@ class ActAddModel(nn.Module):
         """
         super().__init__()
         
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        from .device_utils import get_device
+        self.device = get_device(device)
         
         # Detect or use provided model configuration
         if model_config is None:
