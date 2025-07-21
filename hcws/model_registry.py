@@ -252,6 +252,38 @@ MODEL_REGISTRY = {
         description="Qwen2.5 0.5B Instruct"
     ),
     
+    # Vicuna family (LLaMA-based, publicly available)
+    "vicuna-7b": ModelConfig(
+        name="Vicuna 7B v1.5",
+        model_id="lmsys/vicuna-7b-v1.5",
+        architecture="llama",
+        hidden_dim=4096,
+        num_layers=32,
+        layer_attr_path=["model", "layers"],
+        default_steering_strength=3.5,
+        description="Vicuna 7B v1.5 (LLaMA 2 based)"
+    ),
+    "vicuna-13b": ModelConfig(
+        name="Vicuna 13B v1.3",
+        model_id="lmsys/vicuna-13b-v1.3",
+        architecture="llama",
+        hidden_dim=5120,
+        num_layers=40,
+        layer_attr_path=["model", "layers"],
+        default_steering_strength=3.0,
+        description="Vicuna 13B v1.3 (LLaMA based)"
+    ),
+    "vicuna-33b": ModelConfig(
+        name="Vicuna 33B v1.3",
+        model_id="lmsys/vicuna-33b-v1.3",
+        architecture="llama",
+        hidden_dim=6656,
+        num_layers=60,
+        layer_attr_path=["model", "layers"],
+        default_steering_strength=2.5,
+        description="Vicuna 33B v1.3 (LLaMA based)"
+    ),
+    
     # Gemma family
     "gemma-2b": ModelConfig(
         name="Gemma 2B",
@@ -364,6 +396,13 @@ def detect_model_config(model_name_or_path: str) -> Optional[ModelConfig]:
         return MODEL_REGISTRY["qwen2.5-7b"]
     elif "qwen2" in model_lower:
         return MODEL_REGISTRY["qwen2-7b"]
+    elif "vicuna" in model_lower:
+        if "vicuna-7b" in model_lower:
+            return MODEL_REGISTRY["vicuna-7b"]
+        elif "vicuna-13b" in model_lower:
+            return MODEL_REGISTRY["vicuna-13b"]
+        elif "vicuna-33b" in model_lower:
+            return MODEL_REGISTRY["vicuna-33b"]
     elif "gemma" in model_lower and ("2b" in model_lower or "2B" in model_lower):
         return MODEL_REGISTRY["gemma-2b"]
     elif "gemma" in model_lower:
