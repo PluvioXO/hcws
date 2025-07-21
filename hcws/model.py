@@ -96,9 +96,15 @@ class HCWSModel(nn.Module):
         # Add any additional kwargs
         load_kwargs.update(model_kwargs)
         
+        # Determine the actual model path/ID to use
+        if model_config and model_config.model_id:
+            actual_model_path = model_config.model_id
+        else:
+            actual_model_path = model_name_or_path
+        
         # Load base model and tokenizer
-        self.base_model = AutoModelForCausalLM.from_pretrained(model_name_or_path, **load_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, **load_kwargs)
+        self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **load_kwargs)
+        self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
         
         # Add pad token if not present
         if self.tokenizer.pad_token is None:

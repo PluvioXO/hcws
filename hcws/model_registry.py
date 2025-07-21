@@ -202,24 +202,54 @@ MODEL_REGISTRY = {
     
     # Qwen family
     "qwen2-7b": ModelConfig(
-        name="Qwen2 7B",
-        model_id="Qwen/Qwen2-7B",
+        name="Qwen2 7B Instruct",
+        model_id="Qwen/Qwen2-7B-Instruct",
         architecture="qwen2",
         hidden_dim=3584,
         num_layers=28,
         layer_attr_path=["model", "layers"],
         default_steering_strength=3.0,
-        description="Qwen2 7B"
+        description="Qwen2 7B Instruct"
     ),
     "qwen2.5-7b": ModelConfig(
-        name="Qwen2.5 7B",
-        model_id="Qwen/Qwen2.5-7B",
+        name="Qwen2.5 7B Instruct",
+        model_id="Qwen/Qwen2.5-7B-Instruct",
         architecture="qwen2",
         hidden_dim=3584,
         num_layers=28,
         layer_attr_path=["model", "layers"],
         default_steering_strength=3.0,
-        description="Qwen2.5 7B"
+        description="Qwen2.5 7B Instruct"
+    ),
+    "qwen2.5-3b": ModelConfig(
+        name="Qwen2.5 3B Instruct",
+        model_id="Qwen/Qwen2.5-3B-Instruct",
+        architecture="qwen2",
+        hidden_dim=2048,
+        num_layers=36,
+        layer_attr_path=["model", "layers"],
+        default_steering_strength=3.5,
+        description="Qwen2.5 3B Instruct"
+    ),
+    "qwen2.5-1.5b": ModelConfig(
+        name="Qwen2.5 1.5B Instruct",
+        model_id="Qwen/Qwen2.5-1.5B-Instruct",
+        architecture="qwen2",
+        hidden_dim=1536,
+        num_layers=28,
+        layer_attr_path=["model", "layers"],
+        default_steering_strength=4.0,
+        description="Qwen2.5 1.5B Instruct"
+    ),
+    "qwen2.5-0.5b": ModelConfig(
+        name="Qwen2.5 0.5B Instruct",
+        model_id="Qwen/Qwen2.5-0.5B-Instruct",
+        architecture="qwen2",
+        hidden_dim=896,
+        num_layers=24,
+        layer_attr_path=["model", "layers"],
+        default_steering_strength=4.5,
+        description="Qwen2.5 0.5B Instruct"
     ),
     
     # Gemma family
