@@ -1,38 +1,47 @@
-# Hyper-Conceptor Weighted Steering (HCWS)
+# HCWS (Hyper-Conceptor Weighted Steering)
 
 A lightweight method for steering large language models using conceptor-based activation modification during inference.
 
-## Overview
+## Quick Start
 
-Hyper-Conceptor Weighted Steering (HCWS) provides adaptive control over language model behavior without modifying model weights. The method works by:
+### Unified Testing Interface
 
-1. **Instruction Encoding**: Converting plain-language instructions into dense vectors using a frozen T5 encoder
-2. **Conceptor Generation**: Mapping instruction vectors to layer-specific low-rank matrices that define ellipsoidal subspaces
-3. **Real-time Steering**: Using a lightweight controller to modify activations during inference by contracting them toward target subspaces
+HCWS now includes a clean, JSON-configured testing interface that makes it easy to test different models and scenarios:
 
-## Key Features
+```bash
+# Interactive model and scenario selection
+python test.py
 
-- **No Weight Modification**: Steers model behavior without changing base model parameters
-- **Low Latency**: Adds only a few percent overhead to inference time
-- **Multi-dimensional Control**: Simultaneously steers dozens of semantic directions
-- **Adaptive**: Learns from plain-language instructions for flexible control
-- **Configurable Steering Strength**: Adjustable steering intensity for fine-tuned control
-- **Real-time Control**: Dynamic steering during text generation
+# Test a specific model with all scenarios
+python test.py --model gpt2
 
-## Architecture
+# Test a specific scenario
+python test.py --model qwen2.5-1.5b --scenario basic_steering
 
+# List all available models
+python test.py --list-models
+
+# List all test scenarios
+python test.py --list-scenarios
 ```
-Plain Text Instruction → T5 Encoder → Dense Vector z
-                                          ↓
-                                    Hyper-Network
-                                          ↓
-                              Layer-specific Conceptors
-                                    C_ℓ = U_ℓ diag(s_ℓ) U_ℓᵀ
-                                          ↓
-                                    Controller
-                                          ↓
-                              Activation Modification
-                              h'_{t,ℓ} = h_{t,ℓ} - g_t w_{ℓ,t} C_ℓ h_{t,ℓ}
+
+The testing system uses `models.json` to organize models by category:
+- **Small & Fast**: gpt2, qwen2.5-0.5b, qwen2.5-1.5b, gemma-2b (ideal for testing)
+- **Medium Performance**: qwen2.5-3b, qwen2.5-7b, vicuna-7b, mistral-7b (balanced performance)
+- **Large Performance**: llama2-7b, llama3-8b, llama3.1-8b, llama2-13b (high performance)
+- **Advanced Models**: mixtral-8x7b, deepseek-v3, deepseek-v2.5 (cutting-edge, requires significant resources)
+
+### Quick Examples
+
+```bash
+# Start with a small, fast model for testing
+python test.py --model gpt2
+
+# Try a balanced model with good performance
+python test.py --model qwen2.5-1.5b
+
+# Test the state-of-the-art (requires powerful hardware)
+python test.py --model deepseek-v3
 ```
 
 ## Installation
