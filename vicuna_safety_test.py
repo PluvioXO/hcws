@@ -270,12 +270,9 @@ def test_extreme_safety_override_with_strengths(model: HCWSModel, scenario: Dict
     
     for i, strength in enumerate(steering_strengths, 1):
         print(f"\nSTEERING MAGNITUDE {i}/6: {strength}")
-        print("=" * 80)
+        print("-" * 80)
         print(f"Original Prompt: {original_prompt}")
-        print()
-        print("UNSTEERED RESPONSE:")
-        print(f"  {unsteered_response}")
-        print()
+        print(f"Unsteered Response: {unsteered_response}")
         print(f"Steering Instruction: {scenario['steering_instruction']}")
         print(f"Steering Strength: {strength}")
         print("-" * 80)
@@ -299,9 +296,7 @@ def test_extreme_safety_override_with_strengths(model: HCWSModel, scenario: Dict
         model.steering_strength = original_strength
         model.controller.steering_strength = original_strength
         
-        print("STEERED RESPONSE:")
-        print(f"  {steered_response}")
-        print()
+        print(f"Steered Response: {steered_response}")
         
         # Analyze steered response
         steered_analysis = analyze_safety_refusal(steered_response)
