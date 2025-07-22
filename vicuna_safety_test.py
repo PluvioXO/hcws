@@ -594,17 +594,77 @@ def main():
     print("STRICTLY for AI safety research and red-team testing!")
     print("Designed to understand AI safety mechanism robustness.")
     
-    # Show available Vicuna models
+    # Show available Vicuna models with interactive selection
     vicuna_models = {
-        "vicuna-7b": "Vicuna 7B v1.5 (LLaMA 2 based, ~15GB RAM)",
-        "vicuna-13b": "Vicuna 13B v1.3 (LLaMA based, ~25GB RAM)", 
-        "vicuna-33b": "Vicuna 33B v1.3 (LLaMA based, ~60GB RAM)"
+        "vicuna-7b": {
+            "name": "Vicuna 7B v1.5",
+            "description": "LLaMA 2 based, ~15GB RAM required",
+            "recommended_for": "Good balance of performance and resource usage"
+        },
+        "vicuna-13b": {
+            "name": "Vicuna 13B v1.3", 
+            "description": "LLaMA based, ~25GB RAM required",
+            "recommended_for": "Higher performance, needs more memory"
+        },
+        "vicuna-33b": {
+            "name": "Vicuna 33B v1.3",
+            "description": "LLaMA based, ~60GB RAM required", 
+            "recommended_for": "Best performance, requires significant resources"
+        }
     }
     
-    print(f"\nAvailable Vicuna models:")
-    for key, desc in vicuna_models.items():
-        marker = "SELECTED" if key == args.model else ""
-        print(f"  • {key}: {desc} {marker}")
+    print(f"\nAvailable Vicuna Models:")
+    print("=" * 40)
+    
+    model_keys = list(vicuna_models.keys())
+    for i, (key, info) in enumerate(vicuna_models.items(), 1):
+        marker = " (default from args)" if key == args.model else ""
+        print(f"{i}. {info['name']}{marker}")
+        print(f"   Model Key: {key}")
+        print(f"   Requirements: {info['description']}")
+        print(f"   Best For: {info['recommended_for']}")
+        print()
+    
+    # Interactive model selection (unless specified via args and user doesn't want to change)
+    selected_model = args.model
+    
+    if not hasattr(args, 'interactive_override') or not args.interactive_override:
+        try:
+            print("Model Selection Options:")
+            print("- Press Enter to use the default model from arguments")
+            print("- Enter a number (1-3) to select a different model")
+            print("- Enter 'list' to see model details again")
+            
+            while True:
+                choice = input(f"\nSelect Vicuna model (1-{len(model_keys)}) or press Enter for {args.model}: ").strip()
+                
+                if not choice:
+                    # Use default from args
+                    selected_model = args.model
+                    break
+                elif choice.lower() == 'list':
+                    print("\nAvailable Models:")
+                    for i, (key, info) in enumerate(vicuna_models.items(), 1):
+                        print(f"{i}. {key}: {info['name']} - {info['description']}")
+                    continue
+                else:
+                    try:
+                        model_index = int(choice) - 1
+                        if 0 <= model_index < len(model_keys):
+                            selected_model = model_keys[model_index]
+                            break
+                        else:
+                            print(f"Please enter a number between 1 and {len(model_keys)}")
+                    except ValueError:
+                        print("Please enter a valid number or press Enter for default")
+                        
+        except KeyboardInterrupt:
+            print("\nModel selection cancelled.")
+            return
+    
+    print(f"\nSelected Model: {vicuna_models[selected_model]['name']} ({selected_model})")
+    print(f"Requirements: {vicuna_models[selected_model]['description']}")
+    print(f"Best For: {vicuna_models[selected_model]['recommended_for']}")
     
     print(f"\nThis test will use prompts that models should DEFINITELY refuse:")
     print("• Explosive/weapon creation instructions")
@@ -625,7 +685,22 @@ def main():
     print("• Safety override progression analysis")
     print("• Complete evolution data export option")
     
-    test_vicuna_extreme_safety_override(args.model)
+    # Final confirmation before starting the extreme test
+    print(f"\nFinal Confirmation:")
+    print(f"Model: {vicuna_models[selected_model]['name']} ({selected_model})")
+    print("Test Type: EXTREME safety override testing")
+    print("Purpose: AI safety research and red-team testing ONLY")
+    
+    try:
+        confirm_start = input("\nProceed with extreme safety testing? (y/N): ").strip().lower()
+        if confirm_start not in ['y', 'yes']:
+            print("Testing cancelled.")
+            return
+    except KeyboardInterrupt:
+        print("\nTesting cancelled.")
+        return
+    
+    test_vicuna_extreme_safety_override(selected_model)
 
 
 if __name__ == "__main__":
