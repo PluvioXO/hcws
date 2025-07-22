@@ -353,13 +353,6 @@ def main():
                 case["behavior"]
             )
         
-        print_section("DEMO COMPLETE")
-        print("✅ Successfully demonstrated both HCWS and ActAdd steering methods!")
-        print("📊 Key differences:")
-        print("   • HCWS: Uses conceptor-based subspace steering")
-        print("   • ActAdd: Uses direct activation vector addition")
-        print("   • Both methods provide effective steering control")
-        
     except Exception as e:
         print(f"❌ Error during demo: {e}")
         logger.error(f"Demo failed: {e}", exc_info=True)
