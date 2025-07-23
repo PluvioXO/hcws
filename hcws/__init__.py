@@ -23,7 +23,11 @@ from .device_utils import (
     get_best_device,
     get_device_info,
     print_device_info,
-    get_device
+    get_device,
+    get_tpu_device,
+    initialize_tpu,
+    is_tpu_available,
+    get_tpu_cores
 )
 
 __version__ = "0.1.0"
@@ -44,5 +48,9 @@ __all__ = [
     "get_best_device",
     "get_device_info", 
     "print_device_info",
-    "get_device"
+    "get_device",
+    "get_tpu_device",
+    "initialize_tpu",
+    "is_tpu_available",
+    "get_tpu_cores"
 ] 

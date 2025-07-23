@@ -188,12 +188,90 @@ response = model.generate(
 )
 ```
 
+## Hardware Support
+
+HCWS supports multiple hardware configurations for optimal performance:
+
+### Device Priority (Auto-Detection)
+
+1. **Google TPU** - Optimal for large models and high-throughput inference
+2. **Apple Silicon (MPS)** - Excellent for M1/M2/M3 MacBooks
+3. **NVIDIA GPU (CUDA)** - Standard GPU acceleration
+4. **CPU** - Fallback for all systems
+
+### TPU Support (Google Cloud)
+
+For Google Cloud TPU support, install PyTorch XLA:
+
+```bash
+# For Google Cloud TPU VMs
+pip install torch_xla -f https://storage.googleapis.com/libtpu-releases/index.html
+
+# For Google Colab TPU
+pip install torch_xla[tpu] -f https://storage.googleapis.com/libtpu-releases/index.html
+```
+
+#### TPU Usage Examples
+
+```bash
+# Auto-detect and use TPU if available
+python demo.py --model gpt2
+
+# Explicitly use TPU with optimizations
+python demo.py --model gpt2 --device tpu --use-bf16
+
+# Use TPU with large model
+python demo.py --model deepseek-v3 --device tpu --use-bf16 --tpu-cores 8
+
+# TPU debugging and metrics
+python demo.py --model gpt2 --device tpu --tpu-metrics-debug
+```
+
+#### TPU Environment Setup
+
+For Google Cloud TPU VMs:
+
+```bash
+# Set TPU environment
+export PJRT_DEVICE=TPU
+export XLA_USE_BF16=1  # Enable bfloat16 for better performance
+
+# Run with TPU
+python demo.py --model gpt2 --device tpu --use-bf16
+```
+
+#### TPU Performance Tips
+
+- Use `--use-bf16` flag for 2x faster training/inference
+- Large models (>1B parameters) show the most TPU benefit
+- TPU works best with batch sizes that are multiples of 8
+- Use `xm.mark_step()` for optimal compilation in custom code
+
+### Device-Specific Usage
+
+```python
+from hcws import HCWSModel
+
+# Auto-detect best device
+model = HCWSModel("gpt2")  # Uses TPU > MPS > CUDA > CPU
+
+# Explicitly specify device
+model = HCWSModel("gpt2", device="tpu")    # Force TPU
+model = HCWSModel("gpt2", device="cuda")   # Force CUDA
+model = HCWSModel("gpt2", device="mps")    # Force Apple Silicon
+model = HCWSModel("gpt2", device="cpu")    # Force CPU
+
+# TPU with optimizations
+model = HCWSModel("gpt2", device="tpu", torch_dtype=torch.bfloat16)
+```
+
 ## Performance Considerations
 
 - **Steering Strength**: Values between 3.0-5.0 typically provide optimal results
 - **Hook Frequency**: Lower values (1-2) provide more frequent steering but may impact fluency
 - **Conceptor Rank**: Higher ranks (32-64) provide more expressive steering but increase computational overhead
-- **Device**: GPU acceleration recommended for production use
+- **Device Priority**: TPU > GPU > Apple Silicon > CPU for large models
+- **TPU Optimization**: Use bfloat16 precision for 2x performance improvement
 
 ## Troubleshooting
 

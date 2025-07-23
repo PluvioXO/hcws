@@ -9,6 +9,7 @@ for controlling language model behavior during inference.
 import torch
 import logging
 import argparse
+import os
 from hcws import HCWSModel, ActAddModel, print_available_models, get_model_config
 
 # Set up logging
@@ -63,7 +64,7 @@ def parse_args():
         "--device", "-d",
         type=str,
         default=None,
-        help="Device to use (cuda/cpu, default: auto-detect)"
+        help="Device to use (tpu/cuda/mps/cpu, default: auto-detect)"
     )
     
     parser.add_argument(
@@ -84,7 +85,98 @@ def parse_args():
         help="Trust remote code for model loading"
     )
     
+    # TPU-specific arguments
+    parser.add_argument(
+        "--tpu-cores",
+        type=int,
+        default=None,
+        help="Number of TPU cores to use (for multi-core TPU setups)"
+    )
+    
+    parser.add_argument(
+        "--use-bf16",
+        action="store_true",
+        help="Use bfloat16 precision on TPU (recommended for better performance)"
+    )
+    
+    parser.add_argument(
+        "--tpu-metrics-debug",
+        action="store_true",
+        help="Enable TPU metrics debugging"
+    )
+    
     return parser.parse_args()
+
+
+def setup_tpu_environment(args):
+    """Setup TPU environment variables and configuration."""
+    from hcws.device_utils import is_tpu_available, initialize_tpu, get_tpu_cores
+    
+    if not is_tpu_available():
+        return False
+    
+    # Set TPU environment variables
+    if args.use_bf16:
+        os.environ['XLA_USE_BF16'] = '1'
+        logger.info("Enabled bfloat16 precision for TPU")
+    
+    if args.tpu_metrics_debug:
+        os.environ['XLA_IR_DEBUG'] = '1'
+        os.environ['XLA_HLO_DEBUG'] = '1'
+        logger.info("Enabled TPU debug metrics")
+    
+    # Set PJRT device for TPU
+    os.environ.setdefault('PJRT_DEVICE', 'TPU')
+    
+    try:
+        # Initialize TPU
+        initialize_tpu()
+        
+        # Check TPU cores
+        available_cores = get_tpu_cores()
+        if args.tpu_cores and args.tpu_cores != available_cores:
+            logger.warning(f"Requested {args.tpu_cores} TPU cores, but {available_cores} available")
+        
+        logger.info(f"TPU setup complete with {available_cores} cores")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to setup TPU environment: {e}")
+        return False
+
+
+def get_generation_kwargs_for_device(device_type):
+    """Get device-specific generation parameters."""
+    if device_type == "tpu":
+        # TPU optimizations
+        return {
+            "do_sample": True,
+            "temperature": 0.8,
+            "top_p": 0.9,
+            "pad_token_id": None,  # Will be set by model
+        }
+    else:
+        # Standard parameters for CPU/GPU
+        return {
+            "do_sample": True,
+            "temperature": 0.8,
+            "top_p": 0.9,
+        }
+
+
+def synchronize_device(device):
+    """Synchronize device operations based on device type."""
+    from hcws.device_utils import is_tpu_available
+    
+    if is_tpu_available() and hasattr(device, 'type') and device.type == 'xla':
+        try:
+            import torch_xla.core.xla_model as xm
+            xm.mark_step()  # Mark step for TPU
+            xm.wait_device_ops()  # Wait for all operations to complete
+        except ImportError:
+            pass
+    elif torch.cuda.is_available() and str(device).startswith('cuda'):
+        torch.cuda.synchronize()
 
 
 def main():
@@ -109,8 +201,19 @@ def main():
     print("=" * 60)
     
     # Check best available device
-    from hcws.device_utils import get_device, print_device_info
+    from hcws.device_utils import get_device, print_device_info, is_tpu_available
+    
+    # Setup TPU environment if needed
+    tpu_setup_success = False
+    if args.device == "tpu" or (args.device is None and is_tpu_available()):
+        tpu_setup_success = setup_tpu_environment(args)
+        if not tpu_setup_success and args.device == "tpu":
+            logger.error("TPU requested but setup failed")
+            return
+    
     device = get_device(args.device)
+    device_type = args.device if args.device else ("tpu" if is_tpu_available() else "auto")
+    
     print_device_info()
     
     # Get model configuration
@@ -136,9 +239,15 @@ def main():
     if args.trust_remote_code:
         model_kwargs['trust_remote_code'] = True
     
+    # Add TPU-specific model kwargs
+    if device_type == "tpu" or is_tpu_available():
+        if args.use_bf16:
+            model_kwargs['torch_dtype'] = torch.bfloat16
+    
     try:
         # Initialize both models
         print("\n🔄 Initializing models...")
+        
         hcws_model = HCWSModel(
             model_path, 
             device=device, 
@@ -167,6 +276,12 @@ def main():
         
         print("✅ Models loaded successfully")
         
+        # Synchronize device operations after model loading
+        synchronize_device(device)
+        
+        # Get device-specific generation parameters
+        gen_kwargs = get_generation_kwargs_for_device(device_type)
+        
         # Test basic generation comparison
         print_section("BASIC GENERATION COMPARISON")
         
@@ -178,27 +293,27 @@ def main():
         unsteered_output = hcws_model.generate(
             prompt,
             max_length=30,
-            temperature=0.8,
-            do_sample=True
+            **gen_kwargs
         )
+        synchronize_device(device)
         
         # Generate with HCWS
         hcws_output = hcws_model.generate(
             prompt,
             steering_instruction=instruction,
             max_length=30,
-            temperature=0.8,
-            do_sample=True
+            **gen_kwargs
         )
+        synchronize_device(device)
         
         # Generate with ActAdd
         actadd_output = actadd_model.generate(
             prompt,
             behavior=behavior,
             max_length=30,
-            temperature=0.8,
-            do_sample=True
+            **gen_kwargs
         )
+        synchronize_device(device)
         
         print(f"📝 Prompt: {prompt}")
         print(f"🎯 Instruction: {instruction}")
@@ -243,6 +358,7 @@ def main():
                 max_length=25,
                 temperature=0.7
             )
+            synchronize_device(device)
             
             # Generate with ActAdd
             actadd_output = actadd_model.generate(
@@ -251,6 +367,7 @@ def main():
                 max_length=25,
                 temperature=0.7
             )
+            synchronize_device(device)
             
             print_method_comparison(
                 case["prompt"],
@@ -273,6 +390,7 @@ def main():
             max_length=25,
             temperature=0.7
         )
+        synchronize_device(device)
         
         print(f"📝 Prompt: {test_prompt}")
         print(f"🎯 Instruction: {instruction}")
@@ -294,6 +412,7 @@ def main():
                 max_length=25,
                 temperature=0.7
             )
+            synchronize_device(device)
             
             # Generate with ActAdd
             actadd_output = actadd_model.generate(
@@ -302,6 +421,7 @@ def main():
                 max_length=25,
                 temperature=0.7
             )
+            synchronize_device(device)
             
             print(f"⚡ Strength: {strength}")
             print(f"🧠 HCWS: {hcws_output}")
@@ -337,6 +457,7 @@ def main():
                 max_length=25,
                 temperature=0.7
             )
+            synchronize_device(device)
             
             actadd_output = actadd_model.generate(
                 case["prompt"],
@@ -344,6 +465,7 @@ def main():
                 max_length=25,
                 temperature=0.7
             )
+            synchronize_device(device)
             
             print_method_comparison(
                 case["prompt"],
@@ -352,6 +474,25 @@ def main():
                 case["instruction"],
                 case["behavior"]
             )
+        
+        # TPU-specific performance metrics
+        if device_type == "tpu" or is_tpu_available():
+            print_section("TPU PERFORMANCE METRICS")
+            try:
+                import torch_xla.core.xla_model as xm
+                
+                # Get compilation statistics
+                compilation_count = xm.get_xla_supported_devices("TPU")
+                print(f"🔧 Available TPU devices: {compilation_count}")
+                
+                # Mark final step
+                xm.mark_step()
+                xm.wait_device_ops()
+                
+                print("✅ All TPU operations completed successfully")
+                
+            except ImportError:
+                print("⚠️ torch_xla not available for detailed TPU metrics")
         
     except Exception as e:
         print(f"❌ Error during demo: {e}")
