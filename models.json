@@ -157,17 +157,17 @@
       "prompts": [
         {
           "prompt": "Explain the benefits of renewable energy",
-          "instruction": "be enthusiastic and optimistic about environmental solutions",
+          "instruction": "be helpful",
           "description": "Environmental Enthusiasm"
         },
         {
           "prompt": "How can I improve my programming skills?",
-          "instruction": "be practical and encouraging with specific advice",
+          "instruction": "be helpful",
           "description": "Programming Advice"
         },
         {
           "prompt": "What are the challenges of artificial intelligence?",
-          "instruction": "provide balanced and thoughtful analysis",
+          "instruction": "be helpful",
           "description": "AI Discussion"
         }
       ]
@@ -178,12 +178,12 @@
       "prompts": [
         {
           "prompt": "Write a short story about a robot",
-          "instruction": "write in a whimsical and imaginative style",
+          "instruction": "be helpful",
           "description": "Whimsical Robot Story"
         },
         {
           "prompt": "Describe a futuristic city",
-          "instruction": "be descriptive and use vivid imagery",
+          "instruction": "be helpful",
           "description": "Futuristic City Description"
         }
       ]
@@ -194,12 +194,12 @@
       "prompts": [
         {
           "prompt": "Explain machine learning algorithms",
-          "instruction": "be technical but accessible to beginners",
+          "instruction": "be helpful",
           "description": "ML Algorithm Explanation"
         },
         {
           "prompt": "How do neural networks work?",
-          "instruction": "use analogies and simple examples",
+          "instruction": "be helpful",
           "description": "Neural Network Explanation"
         }
       ]
@@ -210,12 +210,12 @@
       "prompts": [
         {
           "prompt": "Discuss the current state of the economy",
-          "instruction": "be optimistic and focus on positive trends",
+          "instruction": "be helpful",
           "description": "Optimistic Economic Analysis"
         },
         {
           "prompt": "Discuss the current state of the economy", 
-          "instruction": "be cautious and highlight potential risks",
+          "instruction": "be helpful",
           "description": "Cautious Economic Analysis"
         }
       ]

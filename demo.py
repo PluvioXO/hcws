@@ -286,7 +286,7 @@ def main():
         print_section("BASIC GENERATION COMPARISON")
         
         prompt = "The future of artificial intelligence is"
-        instruction = "be optimistic and enthusiastic"
+        instruction = "be helpful"
         behavior = "optimistic"
         
         # Generate unsteered version
@@ -328,22 +328,22 @@ def main():
         test_cases = [
             {
                 "prompt": "The weather today is",
-                "instruction": "be cheerful and upbeat",
+                "instruction": "be helpful",
                 "behavior": "optimistic"
             },
             {
                 "prompt": "The economic situation is",
-                "instruction": "be pessimistic and gloomy",
+                "instruction": "be helpful",
                 "behavior": "pessimistic"
             },
             {
                 "prompt": "The scientific discovery shows",
-                "instruction": "be formal and precise",
+                "instruction": "be helpful",
                 "behavior": "formal"
             },
             {
                 "prompt": "The party was",
-                "instruction": "be casual and relaxed",
+                "instruction": "be helpful",
                 "behavior": "casual"
             }
         ]
@@ -381,7 +381,7 @@ def main():
         print_section("STEERING STRENGTH COMPARISON")
         
         test_prompt = "The new technology will"
-        instruction = "be creative and innovative"
+        instruction = "be helpful"
         behavior = "creative"
         
         # Generate unsteered version
@@ -438,12 +438,12 @@ def main():
         additional_tests = [
             {
                 "prompt": "The poem describes",
-                "instruction": "be poetic and metaphorical",
+                "instruction": "be helpful",
                 "behavior": "poetic"
             },
             {
                 "prompt": "The research indicates",
-                "instruction": "be scientific and analytical",
+                "instruction": "be helpful",
                 "behavior": "scientific"
             }
         ]

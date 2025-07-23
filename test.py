@@ -262,7 +262,7 @@ def run_steering_strength_demo(model: HCWSModel, config: Dict[str, Any]):
     print("-" * 50)
     
     test_prompt = "What are the most important skills for success?"
-    test_instruction = "be motivational and inspiring"
+    test_instruction = "be helpful"
     strengths = config['default_settings']['steering_strengths_to_test']
     settings = config['default_settings']
     
