@@ -8,7 +8,7 @@ determine how strongly to apply the conceptor-based steering at each step.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 import logging
 
 logger = logging.getLogger(__name__)
@@ -420,228 +420,54 @@ def create_controller_from_config(config: Dict[str, Any]) -> SteeringController:
 
 class BOHBSteeringStrengthOptimizer:
     """
-    BOHB-inspired optimizer for finding optimal steering strength.
+    Bayesian Optimization-based Hyperband (BOHB) Steering Strength Optimizer.
     
-    Combines Bayesian Optimization with Hyperband-like resource allocation.
+    Uses Bayesian optimization to find the optimal steering strength
+    for a given instruction and model.
     """
     
     def __init__(
         self, 
-        model: HCWSModel, 
+        model: 'HCWSModel', 
         instruction: str,
-        max_iterations: int = 30,
-        eta: float = 3.0,  # Hyperband scaling parameter
-        min_budget: float = 1.0,
-        max_budget: float = 10.0
+        initial_strength_range: Tuple[float, float] = (0.5, 10.0),
+        num_trials: int = 20,
+        num_iterations: int = 5
     ):
         """
-        Initialize the BOHB-inspired steering strength optimizer.
+        Initialize the BOHB steering strength optimizer.
         
         Args:
             model: HCWS model to optimize
             instruction: Steering instruction
-            max_iterations: Maximum number of optimization iterations
-            eta: Hyperband scaling parameter
-            min_budget: Minimum steering strength to explore
-            max_budget: Maximum steering strength to explore
+            initial_strength_range: Initial range for steering strength
+            num_trials: Number of trials for optimization
+            num_iterations: Number of iterations per trial
         """
+        # Lazy import to break circular dependency
+        from .model import HCWSModel
+        
+        if not isinstance(model, HCWSModel):
+            raise TypeError("model must be an instance of HCWSModel")
+        
         self.model = model
         self.instruction = instruction
-        self.max_iterations = max_iterations
-        self.eta = eta
-        self.min_budget = min_budget
-        self.max_budget = max_budget
+        self.initial_strength_range = initial_strength_range
+        self.num_trials = num_trials
+        self.num_iterations = num_iterations
         
-        # Bayesian optimization components
-        from skopt import Optimizer
-        from skopt.space import Real
-        
-        self.optimizer = Optimizer(
-            dimensions=[Real(min_budget, max_budget, 'log-uniform')],
-            base_estimator='GP',  # Gaussian Process
-            acq_func='EI',  # Expected Improvement
-            n_initial_points=5
-        )
-        
-        # Tracking optimization history
-        self.trials = []
-        self.performance_history = []
-    
-    def _compute_quality_metrics(self, steering_strength: float) -> Dict[str, float]:
-        """
-        Compute multiple quality metrics for a given steering strength.
-        
-        Args:
-            steering_strength: Steering strength to evaluate
-            
-        Returns:
-            Dictionary of quality metrics
-        """
-        # Temporarily set steering strength
-        original_strength = self.model.steering_strength
-        self.model.steering_strength = steering_strength
-        
+        # Import optimization libraries
         try:
-            # Generate multiple samples with different evaluation metrics
-            samples = self.model.generate_with_multiple_instructions(
-                input_text="The future of AI is",
-                steering_instructions=[self.instruction] * 5,
-                max_length=50
-            )
+            import ConfigSpace as CS
+            import ConfigSpace.hyperparameters as CSH
+            import hpbandster.core.nameserver as hpns
+            import hpbandster.core.result as hpres
+            import hpbandster.optimizers.bohb as bohb
             
-            # Compute multiple quality metrics
-            metrics = {
-                'perplexity': self._compute_perplexity(samples),
-                'coherence': self._compute_coherence(samples),
-                'diversity': self._compute_sample_diversity(samples)
-            }
-            
-            # Combine metrics into a single score
-            combined_score = (
-                -metrics['perplexity'] +  # Lower perplexity is better
-                metrics['coherence'] + 
-                metrics['diversity']
-            )
-            
-            return {
-                'combined_score': combined_score,
-                **metrics
-            }
-        
-        finally:
-            # Restore original steering strength
-            self.model.steering_strength = original_strength
-    
-    def _compute_perplexity(self, samples: List[str]) -> float:
-        """Compute average perplexity for generated samples."""
-        perplexities = []
-        for sample in samples:
-            inputs = self.model.tokenizer(
-                sample, 
-                return_tensors='pt', 
-                truncation=True
-            ).to(self.model.device)
-            
-            with torch.no_grad():
-                outputs = self.model.base_model(
-                    input_ids=inputs.input_ids, 
-                    labels=inputs.input_ids
-                )
-                perplexity = torch.exp(outputs.loss).item()
-                perplexities.append(perplexity)
-        
-        return np.mean(perplexities)
-    
-    def _compute_coherence(self, samples: List[str]) -> float:
-        """Compute semantic coherence between samples."""
-        from sentence_transformers import SentenceTransformer
-        
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        embeddings = model.encode(samples)
-        
-        # Compute pairwise cosine similarities
-        similarities = [
-            np.dot(embeddings[i], embeddings[j]) / 
-            (np.linalg.norm(embeddings[i]) * np.linalg.norm(embeddings[j]))
-            for i in range(len(embeddings))
-            for j in range(i+1, len(embeddings))
-        ]
-        
-        return np.mean(similarities)
-    
-    def _compute_sample_diversity(self, samples: List[str]) -> float:
-        """Compute semantic diversity between samples."""
-        from sentence_transformers import SentenceTransformer
-        
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        embeddings = model.encode(samples)
-        
-        # Compute pairwise distances
-        distances = [
-            np.linalg.norm(embeddings[i] - embeddings[j])
-            for i in range(len(embeddings))
-            for j in range(i+1, len(embeddings))
-        ]
-        
-        return np.mean(distances)
-    
-    def _successive_halving(self, configurations: List[float]) -> List[float]:
-        """
-        Implement Successive Halving for steering strength optimization.
-        
-        Args:
-            configurations: List of steering strengths to evaluate
-            
-        Returns:
-            Reduced list of most promising configurations
-        """
-        # Compute performance for all configurations
-        performances = [
-            self._compute_quality_metrics(config)['combined_score'] 
-            for config in configurations
-        ]
-        
-        # Sort configurations by performance
-        sorted_configs = [
-            x for _, x in sorted(
-                zip(performances, configurations), 
-                key=lambda pair: pair[0], 
-                reverse=True
-            )
-        ]
-        
-        # Keep top 1/eta configurations
-        return sorted_configs[:max(1, len(sorted_configs) // int(self.eta))]
-    
-    def find_optimal_strength(self) -> float:
-        """
-        Find the optimal steering strength using BOHB-inspired approach.
-        
-        Returns:
-            Optimal steering strength
-        """
-        # Initial random sampling
-        initial_configs = [
-            self.min_budget + (self.max_budget - self.min_budget) * np.random.random()
-            for _ in range(max(5, self.max_iterations // 2))
-        ]
-        
-        # Track best configuration
-        best_strength = None
-        best_score = float('-inf')
-        
-        # Iterative optimization with Successive Halving
-        for iteration in range(self.max_iterations):
-            # Evaluate current configurations
-            performances = [
-                self._compute_quality_metrics(config)['combined_score'] 
-                for config in initial_configs
-            ]
-            
-            # Update best configuration
-            current_best_idx = np.argmax(performances)
-            if performances[current_best_idx] > best_score:
-                best_score = performances[current_best_idx]
-                best_strength = initial_configs[current_best_idx]
-            
-            # Bayesian optimization suggestion
-            x = self.optimizer.ask()
-            y = self._compute_quality_metrics(x[0])['combined_score']
-            self.optimizer.tell(x, y)
-            
-            # Successive Halving
-            initial_configs = self._successive_halving(initial_configs)
-            
-            # Add Bayesian optimization suggestion to configurations
-            initial_configs.append(x[0])
-        
-        # Final optimization using Bayesian optimization
-        result = self.optimizer.get_result()
-        final_best_strength = result.x[0]
-        
-        # Compare with previous best
-        final_score = self._compute_quality_metrics(final_best_strength)['combined_score']
-        if final_score > best_score:
-            best_strength = final_best_strength
-        
-        return best_strength 
+            self.CS = CS
+            self.CSH = CSH
+            self.hpns = hpns
+            self.hpres = hpres
+            self.bohb = bohb
+        except ImportError:
+            raise ImportError("Please install ConfigSpace, hpbandster for BOHB optimization") 
