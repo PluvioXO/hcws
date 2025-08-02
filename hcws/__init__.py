@@ -1,56 +1,30 @@
 """
-Hyper-Conceptor Weighted Steering (HCWS)
+HCWS - Hyper-Conceptor Weighted Steering
 
-A lightweight method for steering large language models using conceptor-based 
-activation modification during inference.
+A library for steering language model behavior using hyper-networks and conceptors.
 """
 
 from .model import HCWSModel
-from .encoder import InstructionEncoder
-from .simple_encoder import SimpleInstructionEncoder
-from .hyper_network import HyperNetwork
-from .conceptors import Conceptor, ConceptorBank
-from .controller import SteeringController
 from .actadd import ActAddModel
-from .model_registry import (
-    ModelConfig, 
-    get_model_config, 
-    list_available_models, 
-    print_available_models,
-    detect_model_config
-)
-from .device_utils import (
-    get_best_device,
-    get_device_info,
-    print_device_info,
-    get_device,
-    get_tpu_device,
-    initialize_tpu,
-    is_tpu_available,
-    get_tpu_cores
-)
+from .device_utils import get_best_device, print_device_info, get_device
+from .model_registry import get_model_config, print_available_models
+from .training import model_train, train_hcws_model, evaluate_hcws_model, save_training_data_template
 
 __version__ = "0.1.0"
+
+# CLI is available but not exported by default
+# Use: python -m hcws train --model gpt2
+
 __all__ = [
     "HCWSModel",
-    "InstructionEncoder",
-    "SimpleInstructionEncoder",
-    "HyperNetwork",
-    "Conceptor",
-    "ConceptorBank",
-    "SteeringController",
-    "ActAddModel",
-    "ModelConfig",
-    "get_model_config",
-    "list_available_models", 
-    "print_available_models",
-    "detect_model_config",
+    "ActAddModel", 
     "get_best_device",
-    "get_device_info", 
     "print_device_info",
     "get_device",
-    "get_tpu_device",
-    "initialize_tpu",
-    "is_tpu_available",
-    "get_tpu_cores"
+    "get_model_config",
+    "print_available_models",
+    "model_train",
+    "train_hcws_model", 
+    "evaluate_hcws_model",
+    "save_training_data_template"
 ] 

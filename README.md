@@ -4,6 +4,30 @@ A lightweight method for steering large language models using conceptor-based ac
 
 ## Quick Start
 
+### Training HCWS Hypernetworks
+
+HCWS now includes comprehensive training functionality following the proper HCWS methodology:
+
+```bash
+# Train with default contrastive data
+python -m hcws train --model gpt2
+
+# Train with custom data and settings
+python -m hcws train --model qwen2.5-1.5b --data my_data.json --epochs 20 --lr 1e-4
+
+# Generate a training data template
+python -m hcws template my_training_data.json
+
+# Use the convenience script (same as module command)
+./hcws-train --model gpt2 --epochs 15
+```
+
+**HCWS Training Methodology:**
+- **Frozen**: Base LLM and instruction encoder (T5)  
+- **Trained**: Hypernetwork and controller components
+- **Loss**: Contrastive success + Conceptor regularization + Sparsity/TV penalties
+- **Deployment**: Everything frozen, minimal inference overhead
+
 ### Unified Testing Interface
 
 HCWS now includes a clean, JSON-configured testing interface that makes it easy to test different models and scenarios:
@@ -26,7 +50,7 @@ python test.py --list-scenarios
 ```
 
 The testing system uses `models.json` to organize models by category:
-- **Small & Fast**: gpt2, qwen2.5-0.5b, qwen2.5-1.5b, gemma-2b (ideal for testing)
+- **Small and Fast**: gpt2, qwen2.5-0.5b, qwen2.5-1.5b, gemma-2b (ideal for testing)
 - **Medium Performance**: qwen2.5-3b, qwen2.5-7b, vicuna-7b, mistral-7b (balanced performance)
 - **Large Performance**: llama2-7b, llama3-8b, llama3.1-8b, llama2-13b (high performance)
 - **Advanced Models**: mixtral-8x7b, deepseek-v3, deepseek-v2.5 (cutting-edge, requires significant resources)
@@ -64,8 +88,7 @@ pip install -r requirements.txt
 ### Basic Usage
 
 ```python
-from hcws import HCWSModel
-import torch
+from hcws import HCWSModel, model_train
 
 # Initialize HCWS with a base model
 model = HCWSModel("gpt2", steering_strength=5.0)
@@ -82,6 +105,13 @@ response = model.generate(
 )
 
 print(response)
+
+# Or train a hypernetwork programmatically
+trained_model = model_train(
+    model_name_or_path="gpt2",
+    epochs=10,
+    learning_rate=1e-4
+)
 ```
 
 ### Steering Strength Control
