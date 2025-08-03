@@ -166,6 +166,9 @@ class HCWSModel(nn.Module):
         self.current_conceptor_bank = None
         self.token_count = 0
         
+        # Training instruction tracking for automatic retraining
+        self.trained_instructions = set()  # Track unique instructions this model has been trained on
+        
         logger.info(f"Initialized HCWS model with base model: {model_name_or_path}")
         logger.info(f"Hidden dim: {self.hidden_dim}, Num layers: {self.num_layers}")
         logger.info(f"Steering strength: {steering_strength}")
@@ -352,6 +355,11 @@ class HCWSModel(nn.Module):
         
         # Prepare steering if instruction is provided
         if steering_instruction is not None:
+            # Check if retraining is needed for this instruction
+            if hasattr(self, 'needs_retraining') and self.needs_retraining([steering_instruction]):
+                logger.warning(f"Instruction '{steering_instruction}' not in trained set. Model may not steer effectively.")
+                logger.info(f"Consider retraining with this instruction. Trained instructions: {self.trained_instructions}")
+            
             self.prepare_steering(steering_instruction)
             self.start_steering()
         
@@ -457,6 +465,7 @@ class HCWSModel(nn.Module):
         state = {
             'hyper_network': self.hyper_network.state_dict(),
             'controller': self.controller.state_dict(),
+            'trained_instructions': list(self.trained_instructions),  # Save trained instructions
             'config': {
                 'hidden_dim': self.hidden_dim,
                 'num_layers': self.num_layers,
@@ -480,7 +489,129 @@ class HCWSModel(nn.Module):
         self.hyper_network.load_state_dict(state['hyper_network'])
         self.controller.load_state_dict(state['controller'])
         
+        # Load trained instructions if available
+        if 'trained_instructions' in state:
+            self.trained_instructions = set(state['trained_instructions'])
+        else:
+            # For compatibility with older saved models
+            self.trained_instructions = set()
+        
         logger.info(f"Loaded steering components from {path}")
+        logger.info(f"Model trained on {len(self.trained_instructions)} unique instructions")
+    
+    def needs_retraining(self, new_instructions: List[str]) -> bool:
+        """
+        Check if the model needs retraining based on new instructions.
+        
+        Args:
+            new_instructions: List of instructions to check
+            
+        Returns:
+            True if retraining is needed, False otherwise
+        """
+        new_instruction_set = set(new_instructions)
+        return not new_instruction_set.issubset(self.trained_instructions)
+    
+    def update_trained_instructions(self, instructions: List[str]):
+        """
+        Update the set of trained instructions.
+        
+        Args:
+            instructions: List of instructions that the model has been trained on
+        """
+        self.trained_instructions.update(instructions)
+    
+    def retrain_for_instructions(
+        self,
+        new_instructions: List[str],
+        training_data_path: Optional[str] = None,
+        output_path: Optional[str] = None,
+        learning_rate: float = 1e-4,
+        epochs: int = 10,
+        batch_size: int = 4,
+        force_retrain: bool = False,
+        verbose: bool = True,
+        **training_kwargs
+    ):
+        """
+        Retrain the hypernetwork if new instructions are detected.
+        
+        This method will automatically check if the provided instructions require
+        retraining and will only train if new instructions are found.
+        
+        Args:
+            new_instructions: List of instructions to check/train for
+            training_data_path: Path to training data (if None, will use default)
+            output_path: Path to save retrained model
+            learning_rate: Learning rate for training
+            epochs: Number of training epochs
+            batch_size: Training batch size
+            force_retrain: Force retraining even if instructions are known
+            verbose: Whether to print progress
+            **training_kwargs: Additional training arguments
+            
+        Returns:
+            True if retraining was performed, False otherwise
+        """
+        # Import here to avoid circular imports
+        from .training import train_hcws_model_with_instruction_check
+        
+        if not force_retrain and not self.needs_retraining(new_instructions):
+            if verbose:
+                print("All instructions already trained. No retraining needed.")
+            return False
+        
+        if verbose:
+            if force_retrain:
+                print("Force retraining requested.")
+            else:
+                new_inst = set(new_instructions) - self.trained_instructions
+                print(f"Retraining for new instructions: {new_inst}")
+        
+        # Create training data with the new instructions
+        training_data = None
+        if training_data_path is None:
+            # Create default training data including the new instructions
+            from .training import create_default_training_data
+            training_data = create_default_training_data()
+            
+            # Add simple examples for new instructions if they're not covered
+            for instruction in new_instructions:
+                # Check if instruction is already in training data
+                found = False
+                for example in training_data['positive'] + training_data['negative']:
+                    if example.get('instruction') == instruction:
+                        found = True
+                        break
+                
+                if not found:
+                    # Add a basic positive example for this instruction
+                    training_data['positive'].append({
+                        'instruction': instruction,
+                        'input': 'Please help me with this task.',
+                        'output': f'I will help you with {instruction} in mind.'
+                    })
+        
+        # Perform retraining
+        history = train_hcws_model_with_instruction_check(
+            model=self,
+            training_data=training_data,
+            data_path=training_data_path,
+            force_retrain=True,  # We've already checked
+            learning_rate=learning_rate,
+            epochs=epochs,
+            batch_size=batch_size,
+            save_path=output_path,
+            verbose=verbose,
+            **training_kwargs
+        )
+        
+        if verbose:
+            print("Retraining completed!")
+            if output_path:
+                print(f"Updated model saved to: {output_path}")
+        
+        return True
     
     def __del__(self):
         """Cleanup hooks on deletion."""

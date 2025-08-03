@@ -373,10 +373,28 @@ def train_hcws_model(
     positive_examples = training_data['positive']
     negative_examples = training_data['negative']
     
+    # Extract unique instructions from training data
+    all_training_instructions = set()
+    for example in positive_examples + negative_examples:
+        if 'instruction' in example:
+            all_training_instructions.add(example['instruction'])
+    
+    # Check if retraining is needed
+    training_instructions_list = list(all_training_instructions)
+    if hasattr(model, 'needs_retraining') and hasattr(model, 'trained_instructions'):
+        if model.needs_retraining(training_instructions_list):
+            if verbose:
+                new_instructions = set(training_instructions_list) - model.trained_instructions
+                print(f"Retraining needed for new instructions: {new_instructions}")
+        else:
+            if verbose:
+                print(f"All instructions already trained, but continuing training anyway...")
+    
     if verbose:
         print(f"Training HCWS Hypernetwork (Contrastive)")
         print(f"Positive examples: {len(positive_examples)}")
         print(f"Negative examples: {len(negative_examples)}")
+        print(f"Unique instructions: {len(all_training_instructions)}")
         print(f"Learning rate: {learning_rate}")
         print(f"Epochs: {epochs}")
         print(f"Batch size: {batch_size}")
@@ -427,6 +445,11 @@ def train_hcws_model(
     for epoch in range(epochs):
         epoch_train_loss = 0.0
         num_batches = 0
+        
+        # Check if we have enough data to train
+        if len(train_pos) == 0 or len(train_neg) == 0:
+            logger.warning("Insufficient training data: need both positive and negative examples")
+            break
         
         # Training phase
         if verbose:
@@ -546,6 +569,10 @@ def train_hcws_model(
     model.hyper_network.eval()  # Freeze trained hypernetwork
     model.controller.eval()      # Freeze trained controller
     
+    # Update the model's trained instructions
+    if hasattr(model, 'update_trained_instructions'):
+        model.update_trained_instructions(training_instructions_list)
+    
     # Save model if requested
     if save_path:
         try:
@@ -556,6 +583,7 @@ def train_hcws_model(
             state_dict = {
                 'hyper_network': model.hyper_network.state_dict(),
                 'controller': model.controller.state_dict(),
+                'trained_instructions': list(all_training_instructions),  # Save trained instructions
                 'training_history': history,
                 'model_config': {
                     'instruction_dim': model.hyper_network.instruction_dim,
@@ -728,6 +756,105 @@ def evaluate_hcws_model(
         print(f"Total test cases: {len(test_cases)}")
     
     return results
+
+
+def train_hcws_model_with_instruction_check(
+    model: HCWSModel,
+    training_data: Optional[Dict[str, List[Dict[str, str]]]] = None,
+    data_path: Optional[str] = None,
+    force_retrain: bool = False,
+    learning_rate: float = 1e-4,
+    weight_decay: float = 1e-5,
+    epochs: int = 10,
+    batch_size: int = 4,
+    validation_split: float = 0.2,
+    alpha_regularization: float = 1e-3,
+    sparsity_weight: float = 1e-4,
+    tv_weight: float = 1e-4,
+    save_path: Optional[str] = None,
+    device: Optional[str] = None,
+    verbose: bool = True
+) -> Dict[str, List[float]]:
+    """
+    Train HCWS model with automatic retraining detection based on new instructions.
+    
+    This function checks if the model needs retraining based on whether it has seen
+    the instructions in the training data before. If new instructions are found,
+    or if force_retrain is True, it will retrain the hypernetwork.
+    
+    Args:
+        model: HCWS model to train
+        training_data: Dict with 'positive' and 'negative' example lists
+        data_path: Path to training data JSON file
+        force_retrain: Force retraining even if instructions are already known
+        learning_rate: Learning rate for optimization
+        weight_decay: Weight decay for regularization
+        epochs: Number of training epochs
+        batch_size: Training batch size
+        validation_split: Fraction of data for validation
+        alpha_regularization: Weight for conceptor regularization (α^{-2})
+        sparsity_weight: Weight for sparsity regularization on s_ℓ
+        tv_weight: Weight for total variation regularization on s_ℓ
+        save_path: Path to save trained model
+        device: Device for training
+        verbose: Whether to print progress
+        
+    Returns:
+        Dictionary with training history (empty if no training was needed)
+    """
+    # Load training data
+    if training_data is None:
+        raw_data = load_training_data(data_path)
+        if isinstance(raw_data, dict) and 'positive' in raw_data:
+            training_data = raw_data
+        else:
+            training_data = create_default_training_data()
+    
+    positive_examples = training_data['positive']
+    negative_examples = training_data['negative']
+    
+    # Extract unique instructions from training data
+    all_training_instructions = set()
+    for example in positive_examples + negative_examples:
+        if 'instruction' in example:
+            all_training_instructions.add(example['instruction'])
+    
+    training_instructions_list = list(all_training_instructions)
+    
+    # Check if retraining is needed
+    needs_training = force_retrain
+    if hasattr(model, 'needs_retraining') and not force_retrain:
+        needs_training = model.needs_retraining(training_instructions_list)
+        
+        if verbose:
+            if needs_training:
+                new_instructions = set(training_instructions_list) - model.trained_instructions
+                print(f"New instructions detected: {new_instructions}")
+                print("Retraining hypernetwork...")
+            else:
+                print("All instructions already trained. Skipping training.")
+                print("Use force_retrain=True to retrain anyway.")
+    
+    if not needs_training:
+        return {'train_loss': [], 'val_loss': [], 'epoch': []}
+    
+    # Perform training
+    return train_hcws_model(
+        model=model,
+        training_data=training_data,
+        data_path=None,  # Already loaded
+        learning_rate=learning_rate,
+        weight_decay=weight_decay,
+        epochs=epochs,
+        batch_size=batch_size,
+        validation_split=validation_split,
+        alpha_regularization=alpha_regularization,
+        sparsity_weight=sparsity_weight,
+        tv_weight=tv_weight,
+        save_path=save_path,
+        device=device,
+        verbose=verbose
+    )
 
 
 def model_train(

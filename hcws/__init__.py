@@ -8,7 +8,7 @@ from .model import HCWSModel
 from .actadd import ActAddModel
 from .device_utils import get_best_device, print_device_info, get_device
 from .model_registry import get_model_config, print_available_models
-from .training import model_train, train_hcws_model, evaluate_hcws_model, save_training_data_template
+from .training import model_train, train_hcws_model, train_hcws_model_with_instruction_check, evaluate_hcws_model, save_training_data_template
 
 __version__ = "0.1.0"
 
@@ -25,6 +25,7 @@ __all__ = [
     "print_available_models",
     "model_train",
     "train_hcws_model", 
+    "train_hcws_model_with_instruction_check",
     "evaluate_hcws_model",
     "save_training_data_template"
 ] 
