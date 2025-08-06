@@ -102,9 +102,28 @@ class HCWSModel(nn.Module):
         else:
             actual_model_path = model_name_or_path
         
-        # Load base model and tokenizer
-        self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **load_kwargs)
-        self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
+        # Load base model and tokenizer with special handling for GPT-OSS
+        try:
+            self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **load_kwargs)
+            self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
+        except Exception as e:
+            if "gpt_oss" in str(e).lower() or "does not recognize this architecture" in str(e):
+                print(f"GPT-OSS architecture detected. Installing required dependencies...")
+                try:
+                    import subprocess
+                    import sys
+                    # Try to install the latest transformers that might support GPT-OSS
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "transformers>=4.50.0"])
+                    # Also try trust_remote_code=True which might be needed
+                    load_kwargs['trust_remote_code'] = True
+                    self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **load_kwargs)
+                    self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
+                except Exception as e2:
+                    raise ValueError(f"Failed to load GPT-OSS model even with trust_remote_code=True and latest transformers. "
+                                   f"Original error: {e}. Retry error: {e2}. "
+                                   f"You may need to install a development version of transformers or wait for official support.")
+            else:
+                raise e
         
         # Add pad token if not present
         if self.tokenizer.pad_token is None:

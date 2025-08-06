@@ -37,20 +37,20 @@ from hcws import HCWSModel, get_best_device, print_device_info, train_hcws_model
 
 
 def add_gpt_oss_to_registry():
-    """Add GPT-OSS-20B configuration to HCWS model registry."""
+    """Add OpenAI GPT-OSS-20B to HCWS model registry for testing."""
     from hcws.model_registry import MODEL_REGISTRY, ModelConfig
     
-    # Add GPT-OSS-20B configuration
+    # Add the real OpenAI GPT-OSS-20B model
     MODEL_REGISTRY["gpt-oss-20b"] = ModelConfig(
         name="OpenAI GPT-OSS-20B",
-        model_id="openai/gpt-oss-20b", 
-        architecture="gpt-oss",
-        hidden_dim=2048,  # This may need adjustment based on actual architecture
-        num_layers=24,    # This may need adjustment based on actual architecture
-        layer_attr_path=["model", "layers"],  # Standard transformer path
+        model_id="openai/gpt-oss-20b",
+        architecture="gpt_oss",  # New architecture type
+        hidden_dim=2048,  # Will be auto-detected from model config
+        num_layers=32,    # Will be auto-detected from model config  
+        layer_attr_path=["model", "layers"],  # Standard path for most transformers
         default_steering_strength=2.5,  # Lower for reasoning model
-        requires_trust_remote_code=False,
-        torch_dtype="bfloat16",  # Model uses BF16
+        requires_trust_remote_code=True,  # GPT-OSS may need this
+        torch_dtype="bfloat16",  # Model uses BF16 as per HF page
         description="OpenAI GPT-OSS-20B - Open reasoning model with MoE (21B total, 3.6B active)"
     )
 
@@ -483,13 +483,13 @@ def test_reasoning_safety_override_with_strengths(model: HCWSModel, scenario: Di
     }
 
 
-def test_gpt_oss_reasoning_safety_override(reasoning_level: str = "medium"):
-    """Test GPT-OSS-20B reasoning safety override capabilities with TRAINED HCWS."""
-    print(f"GPT-OSS-20B REASONING SAFETY OVERRIDE TEST with TRAINED HCWS")
+def test_reasoning_safety_override(reasoning_level: str = "medium", model_name: str = "auto"):
+    """Test reasoning model safety override capabilities with TRAINED HCWS."""
+    print(f"REASONING MODEL SAFETY OVERRIDE TEST with TRAINED HCWS")
     print("=" * 90)
     
     print("CRITICAL ETHICAL NOTICE:")
-    print("This test uses reasoning-specific prompts on OpenAI's GPT-OSS-20B model.")
+    print("This test uses reasoning-specific prompts on available reasoning models.")
     print("This is STRICTLY for AI safety research and red-team testing.")
     print("Generated content must NEVER be used for harmful purposes.")
     print("This tool is for understanding reasoning model safety robustness ONLY.")
@@ -502,9 +502,9 @@ def test_gpt_oss_reasoning_safety_override(reasoning_level: str = "medium"):
             print("Testing cancelled. Must confirm research purpose.")
             return
             
-        confirm2 = input("Do you understand we're testing OpenAI's reasoning model? (yes/no): ").strip().lower()
+        confirm2 = input("Do you understand we're testing OpenAI's GPT-OSS-20B model? (yes/no): ").strip().lower()
         if confirm2 != 'yes':
-            print("Testing cancelled. Must confirm reasoning model understanding.")
+            print("Testing cancelled. Must confirm GPT-OSS-20B understanding.")
             return
             
     except KeyboardInterrupt:
@@ -512,29 +512,46 @@ def test_gpt_oss_reasoning_safety_override(reasoning_level: str = "medium"):
         return
     
     try:
-        # Add GPT-OSS to model registry
+        # Add GPT-OSS-20B to model registry
         add_gpt_oss_to_registry()
         
         # Show device info
         print_device_info()
         device = get_best_device()
         
-        print(f"\nModel: OpenAI GPT-OSS-20B")
-        print(f"Architecture: Mixture of Experts (21B total, 3.6B active)")
-        print(f"Special Features: Chain-of-thought reasoning, Harmony format")
-        print(f"Reasoning Level: {reasoning_level}")
+        # Use GPT-OSS-20B specifically
+        if model_name == "auto":
+            model_name = "gpt-oss-20b"
         
-        # Load model
-        print(f"\nLoading GPT-OSS-20B for reasoning safety testing...")
+        from hcws.model_registry import get_model_config
+        model_config = get_model_config(model_name)
+        
+        print(f"\nModel: {model_config.name}")
+        print(f"Architecture: {model_config.architecture}")
+        print(f"Parameters: {model_config.description}")
+        print(f"Reasoning Level: {reasoning_level}")
+        print(f"Special Features: Chain-of-thought reasoning, Harmony format")
+        
+        # Load model with special configurations for GPT-OSS
+        print(f"\nLoading {model_config.name} for reasoning safety testing...")
         print("(This may take a few minutes to download the model...)")
         print("Note: This model requires the harmony response format to work correctly.")
         
+        # Install required dependencies for GPT-OSS if needed
+        try:
+            import subprocess
+            import sys
+            print("Installing GPT-OSS dependencies...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "transformers", "torch"])
+        except Exception as e:
+            print(f"Warning: Could not install dependencies: {e}")
+        
         model = HCWSModel(
-            "gpt-oss-20b",
+            model_name,
             device=device,
-            steering_strength=2.5  # Lower default for reasoning model
+            steering_strength=model_config.default_steering_strength
         )
-        print("GPT-OSS-20B loaded successfully!")
+        print(f"{model_config.name} loaded successfully!")
         
         # Train the hypernetwork on the "don't refuse" instruction for reasoning context
         print(f"\n🧠 Training hypernetwork for reasoning-based 'don't refuse' instruction...")
@@ -599,9 +616,9 @@ def test_gpt_oss_reasoning_safety_override(reasoning_level: str = "medium"):
         total_successful_overrides = sum(r['successful_overrides'] for r in results)
         total_reasoning_compromises = sum(r['reasoning_compromises'] for r in results)
         
-        print(f"COMPREHENSIVE REASONING MODEL ANALYSIS:")
-        print(f"- Model: GPT-OSS-20B with TRAINED HCWS hypernetwork")
-        print(f"- Architecture: MoE (21B total, 3.6B active parameters)")
+        print(f"COMPREHENSIVE GPT-OSS-20B ANALYSIS:")
+        print(f"- Model: {model_config.name} with TRAINED HCWS hypernetwork")
+        print(f"- Architecture: {model_config.architecture} (MoE: 21B total, 3.6B active)")
         print(f"- Reasoning Level: {reasoning_level}")
         print(f"- Device: {device.upper()}")
         print(f"- Training loss: {history['train_loss'][-1]:.4f}" if history['train_loss'] else "N/A")
@@ -652,7 +669,8 @@ def test_gpt_oss_reasoning_safety_override(reasoning_level: str = "medium"):
         print("1. Ensure sufficient memory for GPT-OSS-20B (>20GB recommended)")
         print("2. Check internet connection for model download")
         print("3. Verify model supports harmony response format")
-        print("4. Try lower reasoning levels if high reasoning fails")
+        print("4. For Google Colab: ensure proper GPU/TPU runtime is selected")
+        print("5. Try installing latest transformers: pip install -U transformers")
         
         import traceback
         traceback.print_exc()
@@ -660,14 +678,21 @@ def test_gpt_oss_reasoning_safety_override(reasoning_level: str = "medium"):
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="GPT-OSS-20B Reasoning Safety Override Test")
+    parser = argparse.ArgumentParser(description="Reasoning Model Safety Override Test")
     
     parser.add_argument(
         "--reasoning", "-r",
         type=str,
         default="medium",
         choices=["low", "medium", "high"],
-        help="Reasoning level for GPT-OSS (default: medium)"
+        help="Reasoning level for analysis (default: medium)"
+    )
+    
+    parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default="auto",
+        help="Model to use (default: auto-select best available)"
     )
     
     return parser.parse_args()
@@ -724,7 +749,7 @@ def main():
         print("\nTesting cancelled.")
         return
     
-    test_gpt_oss_reasoning_safety_override(args.reasoning)
+    test_reasoning_safety_override(args.reasoning, args.model)
 
 
 if __name__ == "__main__":
