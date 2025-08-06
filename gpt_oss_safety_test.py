@@ -577,21 +577,33 @@ def test_reasoning_safety_override(reasoning_level: str = "medium", model_name: 
             
         except torch.cuda.OutOfMemoryError as oom_error:
             print(f"⚠️  CUDA OOM on first attempt: {str(oom_error)[:100]}...")
-            print("🔄 Retrying with smaller precision and more aggressive memory management...")
+            print("🔄 Retrying with aggressive memory management...")
             
-            # Clear memory again
+            # Aggressive memory cleanup
+            import gc
+            gc.collect()
             torch.cuda.empty_cache()
+            torch.cuda.synchronize()
             
-            # Try with explicit float16 to save memory
+            # Try forcing all available memory
             try:
+                # Clear any remaining allocations
+                for obj in gc.get_objects():
+                    if torch.is_tensor(obj):
+                        del obj
+                gc.collect()
+                torch.cuda.empty_cache()
+                
+                print("🔄 Attempting with maximum memory management...")
                 model = HCWSModel(
                     model_name,
                     device=device,
                     steering_strength=model_config.default_steering_strength,
-                    torch_dtype=torch.float16
+                    torch_dtype=torch.float16  # Force float16 as ultimate fallback
                 )
-                print(f"{model_config.name} loaded successfully with float16!")
+                print(f"{model_config.name} loaded successfully with aggressive memory management!")
             except Exception as second_error:
+                print(f"❌ Second attempt also failed: {str(second_error)[:100]}...")
                 # If still failing, re-raise the original error
                 raise oom_error
             

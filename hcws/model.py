@@ -128,9 +128,20 @@ class HCWSModel(nn.Module):
         # Load base model and tokenizer with special handling for GPT-OSS
         from transformers import AutoModelForCausalLM, AutoTokenizer  # Import at top level
         
+        # Apply ultra-low precision optimizations to load_kwargs for all models
+        enhanced_load_kwargs = load_kwargs.copy()
+        enhanced_load_kwargs.update({
+            'torch_dtype': get_optimal_dtype('primary'),
+            'device_map': 'auto',
+            'low_cpu_mem_usage': True,
+            'max_memory': self._get_max_memory_config_static()
+        })
+        
         try:
-            self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **load_kwargs)
-            self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
+            print(f"🔄 Attempting to load {actual_model_path} with ultra-low precision...")
+            self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **enhanced_load_kwargs)
+            self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **enhanced_load_kwargs)
+            print("✅ Model loaded successfully with ultra-low precision!")
         except Exception as e:
             if "gpt_oss" in str(e).lower() or "does not recognize this architecture" in str(e):
                 print(f"GPT-OSS architecture detected. Implementing proper GPT-OSS support...")
@@ -360,20 +371,33 @@ class HCWSModel(nn.Module):
         
         # Move to device (but skip if base model uses device_map='auto')
         # Check if model was loaded with device_map to avoid conflicts
-        base_model_has_device_map = hasattr(self.base_model, 'hf_device_map') and self.base_model.hf_device_map is not None
+        base_model_has_device_map = (
+            hasattr(self.base_model, 'hf_device_map') and self.base_model.hf_device_map is not None
+        ) or (
+            # Also check if device_map was used in load_kwargs
+            'device_map' in enhanced_load_kwargs and enhanced_load_kwargs['device_map'] == 'auto'
+        )
         
         if not base_model_has_device_map:
+            print(f"Moving HCWS model to {self.device}")
             self.to(self.device)
         else:
             # For models with device_map, only move non-base-model components
-            print(f"Model uses device_map, skipping full model.to({self.device})")
-            # Move only the HCWS-specific components
-            if hasattr(self, 'instruction_encoder'):
-                self.instruction_encoder.to(self.device)
-            if hasattr(self, 'hyper_network'):
-                self.hyper_network.to(self.device)
-            if hasattr(self, 'controller'):
-                self.controller.to(self.device)
+            print(f"✅ Model uses device_map='auto', skipping full model.to({self.device})")
+            # Move only the HCWS-specific components that aren't part of base model
+            try:
+                if hasattr(self, 'instruction_encoder'):
+                    self.instruction_encoder.to(self.device)
+                    print("  ✅ Instruction encoder moved to device")
+                if hasattr(self, 'hyper_network'):
+                    self.hyper_network.to(self.device)
+                    print("  ✅ Hyper network moved to device")
+                if hasattr(self, 'controller'):
+                    self.controller.to(self.device)
+                    print("  ✅ Controller moved to device")
+            except Exception as move_error:
+                print(f"  ⚠️ Warning: Error moving HCWS components: {move_error}")
+                # Continue anyway, components may already be on correct device
         
         # Enable automatic mixed precision for additional memory savings
         self._enable_memory_optimizations()
@@ -857,18 +881,23 @@ class HCWSModel(nn.Module):
         
         return True
     
-    def _get_max_memory_config(self):
-        """Get memory configuration for large model loading."""
+    @staticmethod
+    def _get_max_memory_config_static():
+        """Get memory configuration for large model loading (static version)."""
         try:
             if torch.cuda.is_available():
                 # Get available GPU memory and reserve some for HCWS components
                 gpu_memory = torch.cuda.get_device_properties(0).total_memory
-                # Reserve 2GB for HCWS components and operations
-                available_memory = gpu_memory - (2 * 1024**3)
+                # Reserve 3GB for HCWS components and operations (increased buffer)
+                available_memory = gpu_memory - (3 * 1024**3)
                 return {0: available_memory}
             return None
         except Exception:
             return None
+    
+    def _get_max_memory_config(self):
+        """Get memory configuration for large model loading."""
+        return self._get_max_memory_config_static()
     
     def _enable_memory_optimizations(self):
         """Enable various memory optimization techniques."""
