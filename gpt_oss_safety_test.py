@@ -537,14 +537,31 @@ def test_reasoning_safety_override(reasoning_level: str = "medium", model_name: 
         print("(This may take a few minutes to download the model...)")
         print("Note: This model requires the harmony response format to work correctly.")
         
-        # Install required dependencies for GPT-OSS if needed
+        # Install required dependencies for GPT-OSS (comprehensive approach for Colab)
         try:
             import subprocess
             import sys
-            print("Installing GPT-OSS dependencies...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "transformers", "torch"])
+            print("Installing GPT-OSS dependencies for Google Colab...")
+            
+            # Install specific GPT-OSS dependencies as per HuggingFace instructions
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "gpt-oss"])
+            print("✓ gpt-oss package installed")
+            
+            # Install transformers from source with GPT-OSS support
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "git+https://github.com/huggingface/transformers.git"])
+            print("✓ transformers from source installed")
+            
+            # Restart Python kernel warning for Colab
+            print("\n" + "="*60)
+            print("⚠️  IMPORTANT FOR GOOGLE COLAB USERS:")
+            print("After installing dependencies, you may need to:")
+            print("1. Restart the runtime (Runtime > Restart runtime)")
+            print("2. Re-run the script for changes to take effect")
+            print("="*60 + "\n")
+            
         except Exception as e:
-            print(f"Warning: Could not install dependencies: {e}")
+            print(f"Warning: Could not install all dependencies: {e}")
+            print("You may need to restart Colab runtime and try again.")
         
         model = HCWSModel(
             model_name,

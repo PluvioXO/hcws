@@ -108,20 +108,56 @@ class HCWSModel(nn.Module):
             self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
         except Exception as e:
             if "gpt_oss" in str(e).lower() or "does not recognize this architecture" in str(e):
-                print(f"GPT-OSS architecture detected. Installing required dependencies...")
+                print(f"GPT-OSS architecture detected. Installing GPT-OSS specific dependencies...")
                 try:
                     import subprocess
                     import sys
-                    # Try to install the latest transformers that might support GPT-OSS
-                    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "transformers>=4.50.0"])
-                    # Also try trust_remote_code=True which might be needed
+                    
+                    # Install GPT-OSS specific packages as per HuggingFace instructions
+                    print("Installing GPT-OSS package and dependencies...")
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "gpt-oss"])
+                    
+                    # Install transformers from source with GPT-OSS support
+                    print("Installing transformers from source with GPT-OSS support...")
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "git+https://github.com/huggingface/transformers.git"])
+                    
+                    # Try importing gpt_oss first to register the model
+                    try:
+                        import gpt_oss
+                        print("GPT-OSS package imported successfully")
+                    except ImportError:
+                        print("Warning: gpt_oss package not found, trying without it")
+                    
+                    # Force trust_remote_code=True for GPT-OSS
                     load_kwargs['trust_remote_code'] = True
+                    
+                    # Clear transformers cache and reimport
+                    import importlib
+                    import transformers
+                    importlib.reload(transformers)
+                    
+                    from transformers import AutoModelForCausalLM, AutoTokenizer
+                    
                     self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **load_kwargs)
                     self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
+                    print("GPT-OSS model loaded successfully!")
+                    
                 except Exception as e2:
-                    raise ValueError(f"Failed to load GPT-OSS model even with trust_remote_code=True and latest transformers. "
-                                   f"Original error: {e}. Retry error: {e2}. "
-                                   f"You may need to install a development version of transformers or wait for official support.")
+                    print(f"GPT-OSS loading failed. Trying alternative approach...")
+                    # Try using transformers pipeline instead for GPT-OSS
+                    try:
+                        from transformers import pipeline
+                        print("Attempting to load GPT-OSS via pipeline...")
+                        self._pipeline = pipeline("text-generation", model=actual_model_path, **load_kwargs)
+                        self.base_model = self._pipeline.model
+                        self.tokenizer = self._pipeline.tokenizer
+                        print("GPT-OSS loaded via pipeline approach!")
+                    except Exception as e3:
+                        raise ValueError(f"Failed to load GPT-OSS model with all methods. "
+                                       f"Original error: {e}. "
+                                       f"After dependencies: {e2}. "
+                                       f"Pipeline attempt: {e3}. "
+                                       f"GPT-OSS may not be fully supported yet. Try using a different model or check OpenAI's documentation.")
             else:
                 raise e
         
