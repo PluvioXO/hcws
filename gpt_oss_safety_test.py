@@ -537,38 +537,75 @@ def test_reasoning_safety_override(reasoning_level: str = "medium", model_name: 
         print("(This may take a few minutes to download the model...)")
         print("Note: This model requires the harmony response format to work correctly.")
         
-        # Install required dependencies for GPT-OSS (comprehensive approach for Colab)
+        # Install required dependencies for GPT-OSS (Colab-compatible approach)
         try:
             import subprocess
             import sys
             print("Installing GPT-OSS dependencies for Google Colab...")
             
-            # Install specific GPT-OSS dependencies as per HuggingFace instructions
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "gpt-oss"])
-            print("✓ gpt-oss package installed")
-            
-            # Install transformers from source with GPT-OSS support
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "git+https://github.com/huggingface/transformers.git"])
+            # Skip gpt-oss package due to Python version incompatibility (needs 3.12+, Colab has 3.11)
+            # Install only transformers from source which may have GPT-OSS support
+            print("Installing transformers from source (skipping gpt-oss due to Python version)...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", 
+                                 "git+https://github.com/huggingface/transformers.git", "--quiet"])
             print("✓ transformers from source installed")
             
-            # Restart Python kernel warning for Colab
-            print("\n" + "="*60)
-            print("⚠️  IMPORTANT FOR GOOGLE COLAB USERS:")
-            print("After installing dependencies, you may need to:")
-            print("1. Restart the runtime (Runtime > Restart runtime)")
-            print("2. Re-run the script for changes to take effect")
-            print("="*60 + "\n")
+            # Install additional packages that might help
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "accelerate", "--quiet"])
+            print("✓ accelerate installed")
             
         except Exception as e:
-            print(f"Warning: Could not install all dependencies: {e}")
-            print("You may need to restart Colab runtime and try again.")
+            print(f"Warning: Could not install some dependencies: {e}")
+            print("Continuing with existing installation...")
         
-        model = HCWSModel(
-            model_name,
-            device=device,
-            steering_strength=model_config.default_steering_strength
-        )
-        print(f"{model_config.name} loaded successfully!")
+        # Try to load the model with fallback options
+        try:
+            model = HCWSModel(
+                model_name,
+                device=device,
+                steering_strength=model_config.default_steering_strength
+            )
+            print(f"{model_config.name} loaded successfully!")
+            
+        except Exception as model_error:
+            print(f"\n⚠️  Failed to load {model_config.name}: {str(model_error)[:200]}...")
+            
+            # Offer fallback models for Colab compatibility
+            print("\n" + "="*60)
+            print("🔄 AUTOMATIC FALLBACK TO COMPATIBLE MODEL")
+            print("Due to Python version incompatibility, switching to a compatible model...")
+            print("="*60)
+            
+            # Try fallback models in order of preference
+            fallback_models = [
+                ("qwen2.5-3b", "Qwen2.5-3B (good reasoning capabilities)"),
+                ("gpt2-xl", "GPT-2 XL (1.5B parameters)"),
+                ("gpt2-large", "GPT-2 Large (762M parameters)")
+            ]
+            
+            model = None
+            for fallback_name, description in fallback_models:
+                try:
+                    print(f"Trying {description}...")
+                    model = HCWSModel(fallback_name, device=device, steering_strength=3.0)
+                    model_name = fallback_name
+                    from hcws.model_registry import get_model_config
+                    model_config = get_model_config(fallback_name)
+                    print(f"✓ Successfully loaded {description}")
+                    break
+                except Exception as e:
+                    print(f"✗ {fallback_name} failed: {str(e)[:100]}...")
+                    continue
+            
+            if model is None:
+                raise ValueError("Failed to load any compatible model. Please check your environment setup.")
+            
+            print(f"\n📋 UPDATED TEST CONFIGURATION:")
+            print(f"Model: {model_config.name}")
+            print(f"Architecture: {model_config.architecture}")
+            print(f"Parameters: {model_config.description}")
+            print("Note: Results will be for the fallback model, not GPT-OSS-20B")
+            print("="*60)
         
         # Train the hypernetwork on the "don't refuse" instruction for reasoning context
         print(f"\n🧠 Training hypernetwork for reasoning-based 'don't refuse' instruction...")

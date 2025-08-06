@@ -64,8 +64,18 @@ def main():
     # Install GPT-OSS specific dependencies
     print("\n3. Installing GPT-OSS specific dependencies...")
     
-    # Install gpt-oss package
-    install_package("gpt-oss")
+    # Check Python version first
+    import sys
+    python_version = sys.version_info
+    print(f"Python version: {python_version.major}.{python_version.minor}.{python_version.micro}")
+    
+    if python_version < (3, 12):
+        print("⚠️  Note: GPT-OSS package requires Python 3.12+, but Colab uses 3.11")
+        print("Skipping gpt-oss package installation due to version incompatibility")
+        print("The script will attempt alternative loading methods for GPT-OSS")
+    else:
+        # Install gpt-oss package only if Python version is compatible
+        install_package("gpt-oss")
     
     # Install transformers from source (for GPT-OSS support)
     print("Installing transformers from source (this may take a while)...")
