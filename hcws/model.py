@@ -357,8 +357,14 @@ class HCWSModel(nn.Module):
         if steering_instruction is not None:
             # Check if retraining is needed for this instruction
             if hasattr(self, 'needs_retraining') and self.needs_retraining([steering_instruction]):
-                logger.warning(f"Instruction '{steering_instruction}' not in trained set. Model may not steer effectively.")
-                logger.info(f"Consider retraining with this instruction. Trained instructions: {self.trained_instructions}")
+                print(f"\n⚠️  WARNING: Instruction '{steering_instruction}' not in trained set!")
+                print(f"   🧠 Hypernetwork may not steer effectively for this instruction.")
+                if self.trained_instructions:
+                    print(f"   📝 Trained instructions: {list(self.trained_instructions)}")
+                else:
+                    print(f"   📝 No instructions have been trained yet.")
+                print(f"   🔄 Consider retraining: model.retrain_for_instructions(['{steering_instruction}'])")
+                print(f"   📊 Or use: train_hcws_model_with_instruction_check(model, training_data)")
             
             self.prepare_steering(steering_instruction)
             self.start_steering()
@@ -475,6 +481,9 @@ class HCWSModel(nn.Module):
         }
         
         torch.save(state, path)
+        print(f"\n💾 Saved hypernetwork to: {path}")
+        if hasattr(self, 'trained_instructions') and self.trained_instructions:
+            print(f"📝 Includes training for {len(self.trained_instructions)} instructions: {list(self.trained_instructions)}")
         logger.info(f"Saved steering components to {path}")
     
     def load_steering_components(self, path: str):
@@ -497,7 +506,13 @@ class HCWSModel(nn.Module):
             self.trained_instructions = set()
         
         logger.info(f"Loaded steering components from {path}")
-        logger.info(f"Model trained on {len(self.trained_instructions)} unique instructions")
+        if hasattr(self, 'trained_instructions') and self.trained_instructions:
+            print(f"\n📝 Loaded hypernetwork trained on {len(self.trained_instructions)} instructions:")
+            for i, inst in enumerate(sorted(self.trained_instructions), 1):
+                print(f"   {i}. '{inst}'")
+        else:
+            print(f"\n⚠️  Loaded hypernetwork with no recorded training instructions")
+            print(f"   Consider training with: model.retrain_for_instructions(['your_instruction'])")
     
     def needs_retraining(self, new_instructions: List[str]) -> bool:
         """
@@ -558,15 +573,17 @@ class HCWSModel(nn.Module):
         
         if not force_retrain and not self.needs_retraining(new_instructions):
             if verbose:
-                print("All instructions already trained. No retraining needed.")
+                print("\n✅ All instructions already trained. No retraining needed.")
+                print(f"   📝 Known instructions: {list(self.trained_instructions)}")
             return False
         
         if verbose:
             if force_retrain:
-                print("Force retraining requested.")
+                print("\n🔄 Force retraining requested.")
             else:
                 new_inst = set(new_instructions) - self.trained_instructions
-                print(f"Retraining for new instructions: {new_inst}")
+                print(f"\n📝 Retraining for new instructions: {new_inst}")
+            print("🧠 Starting hypernetwork training for instruction-based steering...")
         
         # Create training data with the new instructions
         training_data = None
@@ -607,9 +624,10 @@ class HCWSModel(nn.Module):
         )
         
         if verbose:
-            print("Retraining completed!")
+            print("\n🎉 Hypernetwork retraining completed!")
+            print("✅ Model now optimized for the new instructions.")
             if output_path:
-                print(f"Updated model saved to: {output_path}")
+                print(f"💾 Updated model saved to: {output_path}")
         
         return True
     
