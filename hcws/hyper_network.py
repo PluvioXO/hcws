@@ -35,7 +35,8 @@ class HyperNetwork(nn.Module):
         num_hyper_layers: int = 3,
         dropout: float = 0.1,
         use_layer_embedding: bool = True,
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        dtype: torch.dtype = torch.float16
     ):
         """
         Initialize the hyper-network.
@@ -59,6 +60,7 @@ class HyperNetwork(nn.Module):
         self.conceptor_rank = conceptor_rank
         self.hyper_hidden_dim = hyper_hidden_dim
         self.use_layer_embedding = use_layer_embedding
+        self.dtype = dtype
         from .device_utils import get_device
         self.device = get_device(device)
         
@@ -90,8 +92,12 @@ class HyperNetwork(nn.Module):
         # Initialize weights
         self._initialize_weights()
         
+        # Convert to specified dtype for memory savings
+        self.to(dtype=dtype)
+        
         logger.info(f"Initialized HyperNetwork with {num_layers} layers")
         logger.info(f"Conceptor rank: {conceptor_rank}, Hidden dim: {hidden_dim}")
+        logger.info(f"Using dtype: {dtype}")
     
     def _initialize_weights(self):
         """Initialize network weights."""
@@ -117,11 +123,11 @@ class HyperNetwork(nn.Module):
         # Generate parameters for each layer
         U_params = torch.zeros(
             batch_size, self.num_layers, self.hidden_dim, self.conceptor_rank,
-            device=self.device
+            device=self.device, dtype=self.dtype
         )
         s_params = torch.zeros(
             batch_size, self.num_layers, self.conceptor_rank,
-            device=self.device
+            device=self.device, dtype=self.dtype
         )
         
         for layer_idx in range(self.num_layers):

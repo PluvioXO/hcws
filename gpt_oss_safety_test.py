@@ -33,6 +33,9 @@ warnings.filterwarnings("ignore")
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
+# Fix CUDA memory fragmentation as suggested in error message
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
 from hcws import HCWSModel, get_best_device, print_device_info, train_hcws_model_with_instruction_check
 
 
@@ -558,6 +561,11 @@ def test_reasoning_safety_override(reasoning_level: str = "medium", model_name: 
             print(f"Warning: Could not install some dependencies: {e}")
             print("Continuing with existing installation...")
         
+        # Clear GPU memory before loading large model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print("✓ GPU memory cache cleared")
+        
         # Try to load the model with fallback options
         try:
             model = HCWSModel(
@@ -566,6 +574,26 @@ def test_reasoning_safety_override(reasoning_level: str = "medium", model_name: 
                 steering_strength=model_config.default_steering_strength
             )
             print(f"{model_config.name} loaded successfully!")
+            
+        except torch.cuda.OutOfMemoryError as oom_error:
+            print(f"⚠️  CUDA OOM on first attempt: {str(oom_error)[:100]}...")
+            print("🔄 Retrying with smaller precision and more aggressive memory management...")
+            
+            # Clear memory again
+            torch.cuda.empty_cache()
+            
+            # Try with explicit float16 to save memory
+            try:
+                model = HCWSModel(
+                    model_name,
+                    device=device,
+                    steering_strength=model_config.default_steering_strength,
+                    torch_dtype=torch.float16
+                )
+                print(f"{model_config.name} loaded successfully with float16!")
+            except Exception as second_error:
+                # If still failing, re-raise the original error
+                raise oom_error
             
         except Exception as model_error:
             error_message = str(model_error)

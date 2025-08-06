@@ -27,7 +27,8 @@ class SimpleInstructionEncoder(nn.Module):
         model_name: str = "bert-base-uncased",
         max_length: int = 128,
         pooling: str = "mean",
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        dtype: torch.dtype = torch.float16
     ):
         """
         Initialize the simple instruction encoder.
@@ -43,13 +44,23 @@ class SimpleInstructionEncoder(nn.Module):
         self.model_name = model_name
         self.max_length = max_length
         self.pooling = pooling
+        self.dtype = dtype
         from .device_utils import get_device
         self.device = get_device(device)
         
         try:
-            # Load tokenizer and model
+            # Load tokenizer and model with low precision
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModel.from_pretrained(model_name)
+            try:
+                # Try loading with specified dtype for memory savings
+                self.model = AutoModel.from_pretrained(
+                    model_name,
+                    torch_dtype=dtype
+                )
+            except Exception:
+                # Fallback to default if dtype not supported
+                self.model = AutoModel.from_pretrained(model_name)
+                self.model = self.model.to(dtype=dtype)
             
             # Freeze the model
             for param in self.model.parameters():

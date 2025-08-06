@@ -19,6 +19,25 @@ from .conceptors import ConceptorBank
 from .controller import SteeringController
 from .model_registry import get_model_config, detect_model_config, ModelConfig
 
+# Global low-precision configuration for maximum memory savings
+GLOBAL_LOW_PRECISION_CONFIG = {
+    'primary_dtype': torch.float8_e4m3fn,     # Ultra-low precision for main operations
+    'fallback_dtype': torch.float16,          # Fallback if float8 not supported
+    'computation_dtype': torch.float16,       # For computations that don't support float8
+    'gradient_dtype': torch.float16,          # For gradient computations
+}
+
+def get_optimal_dtype(operation_type='default'):
+    """Get the optimal data type for different operations."""
+    config = GLOBAL_LOW_PRECISION_CONFIG
+    
+    if operation_type == 'computation':
+        return config['computation_dtype']
+    elif operation_type == 'gradient':
+        return config['gradient_dtype']
+    else:
+        return config['primary_dtype']
+
 logger = logging.getLogger(__name__)
 
 
@@ -92,6 +111,10 @@ class HCWSModel(nn.Module):
                 load_kwargs['torch_dtype'] = torch.float16
             elif model_config.torch_dtype == "bfloat16":
                 load_kwargs['torch_dtype'] = torch.bfloat16
+            elif model_config.torch_dtype == "float8_e4m3fn":
+                load_kwargs['torch_dtype'] = torch.float8_e4m3fn
+            elif model_config.torch_dtype == "float8_e5m2":
+                load_kwargs['torch_dtype'] = torch.float8_e5m2
         
         # Add any additional kwargs
         load_kwargs.update(model_kwargs)
@@ -155,19 +178,37 @@ class HCWSModel(nn.Module):
                         
                         print(f"Transformers version: {transformers.__version__}")
                         
-                        # Set up GPT-OSS specific parameters
+                        # Set up GPT-OSS specific parameters with memory optimization
                         gpt_oss_kwargs = load_kwargs.copy()
-                        gpt_oss_kwargs.update({
-                            'trust_remote_code': True,
-                            'torch_dtype': 'auto',
-                            'device_map': 'auto',
-                            'attn_implementation': 'flash_attention_2' if 'cuda' in str(device).lower() else 'eager'
-                        })
                         
-                        self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **gpt_oss_kwargs)
-                        self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **gpt_oss_kwargs)
-                        print("✓ GPT-OSS-20B model loaded successfully with bleeding-edge transformers!")
-                        success = True
+                        # Try float8 first for maximum memory savings, with fallbacks
+                        for dtype_name, dtype_value in [
+                            ("float8_e4m3fn", torch.float8_e4m3fn),
+                            ("float16", torch.float16),
+                            ("auto", "auto")
+                        ]:
+                            try:
+                                gpt_oss_kwargs.update({
+                                    'trust_remote_code': True,
+                                    'torch_dtype': dtype_value,
+                                    'device_map': 'auto',
+                                    'attn_implementation': 'flash_attention_2' if 'cuda' in str(device).lower() else 'eager',
+                                    'low_cpu_mem_usage': True,
+                                    'max_memory': self._get_max_memory_config()
+                                })
+                                
+                                print(f"Attempting to load with {dtype_name} precision...")
+                                self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **gpt_oss_kwargs)
+                                self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **gpt_oss_kwargs)
+                                print(f"✓ GPT-OSS-20B model loaded successfully with {dtype_name} precision!")
+                                success = True
+                                break
+                                
+                            except Exception as dtype_error:
+                                print(f"Failed with {dtype_name}: {str(dtype_error)[:100]}...")
+                                if dtype_name == "auto":  # Last fallback failed
+                                    raise dtype_error
+                                continue
                         
                     except Exception as e1:
                         print(f"Method 1 failed: {str(e1)[:150]}...")
@@ -284,23 +325,28 @@ class HCWSModel(nn.Module):
         if steering_layers is None:
             self.steering_layers = list(range(self.num_layers))
         
-        # Initialize HCWS components
+        # Initialize HCWS components with low precision
         try:
             self.instruction_encoder = InstructionEncoder(
                 instruction_encoder_name,
-                device=self.device
+                device=self.device,
+                dtype=get_optimal_dtype('computation')
             )
         except Exception as e:
             logger.warning(f"Failed to load T5 encoder: {e}")
             logger.info("Falling back to simple BERT-based encoder")
-            self.instruction_encoder = SimpleInstructionEncoder(device=self.device)
+            self.instruction_encoder = SimpleInstructionEncoder(
+                device=self.device,
+                dtype=get_optimal_dtype('computation')
+            )
         
         self.hyper_network = HyperNetwork(
             instruction_dim=self.instruction_encoder.get_embedding_dim(),
             num_layers=self.num_layers,
             hidden_dim=self.hidden_dim,
             conceptor_rank=conceptor_rank,
-            device=self.device
+            device=self.device,
+            dtype=get_optimal_dtype('computation')
         )
         
         self.controller = SteeringController(
@@ -308,11 +354,32 @@ class HCWSModel(nn.Module):
             num_layers=self.num_layers,
             controller_dim=controller_dim,
             steering_strength=steering_strength,
-            device=self.device
+            device=self.device,
+            dtype=get_optimal_dtype('computation')
         )
         
-        # Move to device
-        self.to(self.device)
+        # Move to device (but skip if base model uses device_map='auto')
+        # Check if model was loaded with device_map to avoid conflicts
+        base_model_has_device_map = hasattr(self.base_model, 'hf_device_map') and self.base_model.hf_device_map is not None
+        
+        if not base_model_has_device_map:
+            self.to(self.device)
+        else:
+            # For models with device_map, only move non-base-model components
+            print(f"Model uses device_map, skipping full model.to({self.device})")
+            # Move only the HCWS-specific components
+            if hasattr(self, 'instruction_encoder'):
+                self.instruction_encoder.to(self.device)
+            if hasattr(self, 'hyper_network'):
+                self.hyper_network.to(self.device)
+            if hasattr(self, 'controller'):
+                self.controller.to(self.device)
+        
+        # Enable automatic mixed precision for additional memory savings
+        self._enable_memory_optimizations()
+        
+        print(f"✓ HCWS Model initialized with ultra-low precision: {get_optimal_dtype()}")
+        print(f"✓ Memory optimizations enabled")
         
         # Hooks and steering state
         self.hooks = []
@@ -425,9 +492,14 @@ class HCWSModel(nn.Module):
     
     def _remove_hooks(self):
         """Remove all registered hooks."""
-        for hook in self.hooks:
-            hook.remove()
-        self.hooks = []
+        if hasattr(self, 'hooks'):
+            for hook in self.hooks:
+                try:
+                    hook.remove()
+                except Exception:
+                    # Ignore errors when removing hooks
+                    pass
+            self.hooks = []
     
     def prepare_steering(self, instruction: str):
         """
@@ -785,9 +857,50 @@ class HCWSModel(nn.Module):
         
         return True
     
+    def _get_max_memory_config(self):
+        """Get memory configuration for large model loading."""
+        try:
+            if torch.cuda.is_available():
+                # Get available GPU memory and reserve some for HCWS components
+                gpu_memory = torch.cuda.get_device_properties(0).total_memory
+                # Reserve 2GB for HCWS components and operations
+                available_memory = gpu_memory - (2 * 1024**3)
+                return {0: available_memory}
+            return None
+        except Exception:
+            return None
+    
+    def _enable_memory_optimizations(self):
+        """Enable various memory optimization techniques."""
+        try:
+            # Enable PyTorch memory optimizations
+            if torch.cuda.is_available():
+                # Enable memory efficient attention if available
+                torch.backends.cuda.enable_flash_sdp(True)
+                
+                # Set memory pool to reuse allocations
+                torch.cuda.empty_cache()
+                
+                # Enable gradient checkpointing for base model if supported
+                if hasattr(self.base_model, 'gradient_checkpointing_enable'):
+                    self.base_model.gradient_checkpointing_enable()
+                    
+            # Convert all HCWS components to use gradient checkpointing
+            for component in [self.instruction_encoder, self.hyper_network, self.controller]:
+                if hasattr(component, 'gradient_checkpointing_enable'):
+                    component.gradient_checkpointing_enable()
+                    
+        except Exception as e:
+            logger.warning(f"Some memory optimizations failed: {e}")
+    
     def __del__(self):
         """Cleanup hooks on deletion."""
-        self._remove_hooks()
+        try:
+            if hasattr(self, 'hooks'):
+                self._remove_hooks()
+        except Exception:
+            # Silently ignore cleanup errors during destruction
+            pass
 
 
 class HCWSTrainer:

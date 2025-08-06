@@ -32,7 +32,8 @@ class SteeringController(nn.Module):
         use_attention: bool = True,
         use_temporal_smoothing: bool = True,
         smoothing_factor: float = 0.9,
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        dtype: torch.dtype = torch.float16
     ):
         """
         Initialize the steering controller.
@@ -56,6 +57,7 @@ class SteeringController(nn.Module):
         self.use_attention = use_attention
         self.use_temporal_smoothing = use_temporal_smoothing
         self.smoothing_factor = smoothing_factor
+        self.dtype = dtype
         from .device_utils import get_device
         self.device = get_device(device)
         
@@ -94,7 +96,11 @@ class SteeringController(nn.Module):
         # Initialize weights
         self._initialize_weights()
         
+        # Convert to specified dtype for memory savings
+        self.to(dtype=dtype)
+        
         logger.info(f"Initialized SteeringController with {num_layers} layers")
+        logger.info(f"Using dtype: {dtype}")
     
     def _initialize_weights(self):
         """Initialize network weights."""
