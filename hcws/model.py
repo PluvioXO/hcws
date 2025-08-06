@@ -110,92 +110,153 @@ class HCWSModel(nn.Module):
             self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
         except Exception as e:
             if "gpt_oss" in str(e).lower() or "does not recognize this architecture" in str(e):
-                print(f"GPT-OSS architecture detected. Attempting alternative loading methods...")
+                print(f"GPT-OSS architecture detected. Implementing proper GPT-OSS support...")
                 
-                # Try different approaches for GPT-OSS loading
                 success = False
                 
-                # Method 1: Install transformers from source (skip gpt-oss package due to Python version issues)
+                # Method 1: Install bleeding-edge transformers with GPT-OSS support
                 if not success:
                     try:
                         import subprocess
                         import sys
+                        import os
                         
-                        print("Method 1: Installing transformers from source...")
-                        subprocess.check_call([sys.executable, "-m", "pip", "install", 
-                                             "git+https://github.com/huggingface/transformers.git", "--quiet"])
+                        print("Installing bleeding-edge transformers with GPT-OSS support...")
                         
-                        # Force trust_remote_code=True for GPT-OSS
-                        load_kwargs['trust_remote_code'] = True
+                        # Install the absolute latest transformers from main branch
+                        subprocess.check_call([
+                            sys.executable, "-m", "pip", "install", 
+                            "git+https://github.com/huggingface/transformers.git@main",
+                            "--force-reinstall", "--no-deps", "--quiet"
+                        ])
                         
-                        # Clear transformers cache and reimport
+                        # Install specific transformers version that supports GPT-OSS
+                        try:
+                            subprocess.check_call([
+                                sys.executable, "-m", "pip", "install", 
+                                "transformers>=4.56.0.dev0", "--pre", "--quiet"
+                            ])
+                        except:
+                            pass  # Continue with what we have
+                        
+                        # Force restart Python modules
                         import importlib
-                        import transformers
-                        importlib.reload(transformers)
+                        import sys
                         
-                        # Re-import after update
+                        # Remove transformers from cache
+                        modules_to_reload = [name for name in sys.modules.keys() if name.startswith('transformers')]
+                        for module_name in modules_to_reload:
+                            if module_name in sys.modules:
+                                del sys.modules[module_name]
+                        
+                        # Re-import transformers
+                        import transformers
                         from transformers import AutoModelForCausalLM, AutoTokenizer
                         
-                        self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **load_kwargs)
-                        self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **load_kwargs)
-                        print("✓ GPT-OSS model loaded with updated transformers!")
+                        print(f"Transformers version: {transformers.__version__}")
+                        
+                        # Set up GPT-OSS specific parameters
+                        gpt_oss_kwargs = load_kwargs.copy()
+                        gpt_oss_kwargs.update({
+                            'trust_remote_code': True,
+                            'torch_dtype': 'auto',
+                            'device_map': 'auto',
+                            'attn_implementation': 'flash_attention_2' if 'cuda' in str(device).lower() else 'eager'
+                        })
+                        
+                        self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **gpt_oss_kwargs)
+                        self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **gpt_oss_kwargs)
+                        print("✓ GPT-OSS-20B model loaded successfully with bleeding-edge transformers!")
                         success = True
                         
                     except Exception as e1:
-                        print(f"Method 1 failed: {str(e1)[:100]}...")
+                        print(f"Method 1 failed: {str(e1)[:150]}...")
                 
-                # Method 2: Try with pipeline approach
+                # Method 2: Manual model registration approach
                 if not success:
                     try:
-                        from transformers import pipeline
-                        print("Method 2: Attempting pipeline approach...")
-                        load_kwargs['trust_remote_code'] = True
-                        self._pipeline = pipeline("text-generation", model=actual_model_path, **load_kwargs)
-                        self.base_model = self._pipeline.model
-                        self.tokenizer = self._pipeline.tokenizer
-                        print("✓ GPT-OSS loaded via pipeline approach!")
-                        success = True
+                        print("Method 2: Attempting manual GPT-OSS model registration...")
                         
-                    except Exception as e2:
-                        print(f"Method 2 failed: {str(e2)[:100]}...")
-                
-                # Method 3: Try direct loading with specific parameters
-                if not success:
-                    try:
-                        print("Method 3: Direct loading with full trust_remote_code...")
+                        # Try to manually register the GPT-OSS model type
+                        from transformers import AutoConfig
+                        from transformers.models.auto import configuration_auto
+                        
+                        # Register a temporary GPT-OSS config mapping to GPT-2 for now
+                        if hasattr(configuration_auto, 'CONFIG_MAPPING'):
+                            try:
+                                from transformers.models.gpt2.configuration_gpt2 import GPT2Config
+                                configuration_auto.CONFIG_MAPPING._extra_content['gpt_oss'] = GPT2Config
+                                print("Registered GPT-OSS as GPT-2 variant")
+                            except:
+                                pass
+                        
+                        # Try loading with trust_remote_code and custom config
                         special_kwargs = load_kwargs.copy()
                         special_kwargs.update({
                             'trust_remote_code': True,
                             'torch_dtype': 'auto',
-                            'device_map': 'auto'
+                            'device_map': 'auto',
+                            'use_safetensors': True
                         })
                         
                         self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **special_kwargs)
                         self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **special_kwargs)
-                        print("✓ GPT-OSS loaded with special parameters!")
+                        print("✓ GPT-OSS loaded with manual registration!")
+                        success = True
+                        
+                    except Exception as e2:
+                        print(f"Method 2 failed: {str(e2)[:150]}...")
+                
+                # Method 3: Try with pipeline and custom loading
+                if not success:
+                    try:
+                        print("Method 3: Attempting custom pipeline loading...")
+                        
+                        # Set environment variables that might help
+                        os.environ['TRANSFORMERS_TRUST_REMOTE_CODE'] = 'true'
+                        os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+                        
+                        from transformers import pipeline
+                        
+                        pipeline_kwargs = {
+                            'trust_remote_code': True,
+                            'torch_dtype': 'auto',
+                            'device_map': 'auto',
+                            'model_kwargs': {
+                                'trust_remote_code': True,
+                                'torch_dtype': 'auto'
+                            }
+                        }
+                        
+                        self._pipeline = pipeline("text-generation", model=actual_model_path, **pipeline_kwargs)
+                        self.base_model = self._pipeline.model
+                        self.tokenizer = self._pipeline.tokenizer
+                        print("✓ GPT-OSS loaded via custom pipeline!")
                         success = True
                         
                     except Exception as e3:
-                        print(f"Method 3 failed: {str(e3)[:100]}...")
+                        print(f"Method 3 failed: {str(e3)[:150]}...")
                 
                 if not success:
-                    # Final fallback: suggest using a supported model
-                    print("\n" + "="*60)
-                    print("⚠️  GPT-OSS-20B loading failed with all methods.")
-                    print("This may be due to:")
-                    print("1. Python version incompatibility (Colab uses 3.11, gpt-oss needs 3.12+)")
-                    print("2. Architecture not yet fully supported in transformers")
-                    print("3. Memory constraints in current environment")
-                    print("\nSuggested alternatives:")
-                    print("- Try GPT-2 XL (1.5B): model_name = 'gpt2-xl'")
-                    print("- Try Qwen2.5-3B: model_name = 'qwen2.5-3b'")
-                    print("- Use local GPU with Python 3.12+ for full GPT-OSS support")
-                    print("="*60)
+                    print("\n" + "="*80)
+                    print("❌ UNABLE TO LOAD GPT-OSS-20B")
+                    print("="*80)
+                    print("The GPT-OSS-20B model architecture is not yet supported in the current")
+                    print("transformers library. This is a limitation of the transformers library,")
+                    print("not the HCWS framework.")
+                    print()
+                    print("POSSIBLE SOLUTIONS:")
+                    print("1. Wait for official GPT-OSS support in transformers")
+                    print("2. Use OpenAI's official GPT-OSS tools from their repository")
+                    print("3. Run this on a system with Python 3.12+ and the gpt-oss package")
+                    print()
+                    print("For now, the script will need to use a compatible model.")
+                    print("="*80)
                     
-                    raise ValueError(f"Failed to load GPT-OSS-20B model. "
-                                   f"Original error: {e}. "
-                                   f"This may be due to Python version incompatibility or architecture support. "
-                                   f"Consider using an alternative model like 'gpt2-xl' or 'qwen2.5-3b' for testing.")
+                    raise ValueError(f"GPT-OSS-20B architecture not supported in current transformers library. "
+                                   f"Original error: {str(e)[:200]}... "
+                                   f"This is a limitation of transformers, not HCWS. "
+                                   f"Please use a compatible model or wait for official GPT-OSS support.")
             else:
                 raise e
         

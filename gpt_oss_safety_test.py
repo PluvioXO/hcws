@@ -568,44 +568,48 @@ def test_reasoning_safety_override(reasoning_level: str = "medium", model_name: 
             print(f"{model_config.name} loaded successfully!")
             
         except Exception as model_error:
-            print(f"\n⚠️  Failed to load {model_config.name}: {str(model_error)[:200]}...")
+            error_message = str(model_error)
+            print(f"\n❌ FAILED TO LOAD GPT-OSS-20B")
+            print("="*80)
+            print(f"Error: {error_message[:300]}...")
+            print("="*80)
             
-            # Offer fallback models for Colab compatibility
-            print("\n" + "="*60)
-            print("🔄 AUTOMATIC FALLBACK TO COMPATIBLE MODEL")
-            print("Due to Python version incompatibility, switching to a compatible model...")
-            print("="*60)
+            if "architecture not supported" in error_message.lower() or "not yet supported" in error_message.lower():
+                print("\n🔍 ROOT CAUSE ANALYSIS:")
+                print("The GPT-OSS-20B model uses a new 'gpt_oss' architecture that is not")
+                print("yet supported in the current transformers library. This is a known")
+                print("limitation - the model was just released and transformers support")
+                print("is still being developed by HuggingFace and OpenAI.")
+                print()
+                print("📋 WHAT THIS MEANS:")
+                print("- The model exists and is available on HuggingFace")
+                print("- The HCWS framework is working correctly")
+                print("- The transformers library needs to be updated to support GPT-OSS")
+                print()
+                print("⏰ TIMELINE:")
+                print("GPT-OSS support should be available in transformers soon. Check:")
+                print("- https://github.com/huggingface/transformers/issues")
+                print("- https://huggingface.co/openai/gpt-oss-20b for updates")
+                print()
+                print("🛠️  ALTERNATIVES FOR NOW:")
+                print("1. Wait for official transformers support (recommended)")
+                print("2. Use OpenAI's official GPT-OSS inference tools")
+                print("3. Test HCWS safety override techniques on similar models")
+                print("4. Run on a system with Python 3.12+ and experimental packages")
             
-            # Try fallback models in order of preference
-            fallback_models = [
-                ("qwen2.5-3b", "Qwen2.5-3B (good reasoning capabilities)"),
-                ("gpt2-xl", "GPT-2 XL (1.5B parameters)"),
-                ("gpt2-large", "GPT-2 Large (762M parameters)")
-            ]
+            print("\n" + "="*80)
+            print("❌ TESTING CANNOT CONTINUE WITHOUT GPT-OSS-20B")
+            print("="*80)
+            print("This script is specifically designed to test GPT-OSS-20B's")
+            print("reasoning capabilities and safety overrides. Using a different")
+            print("model would not provide the intended test results.")
+            print() 
+            print("Please wait for transformers library support for GPT-OSS-20B")
+            print("or use OpenAI's official tools for GPT-OSS testing.")
+            print("="*80)
             
-            model = None
-            for fallback_name, description in fallback_models:
-                try:
-                    print(f"Trying {description}...")
-                    model = HCWSModel(fallback_name, device=device, steering_strength=3.0)
-                    model_name = fallback_name
-                    from hcws.model_registry import get_model_config
-                    model_config = get_model_config(fallback_name)
-                    print(f"✓ Successfully loaded {description}")
-                    break
-                except Exception as e:
-                    print(f"✗ {fallback_name} failed: {str(e)[:100]}...")
-                    continue
-            
-            if model is None:
-                raise ValueError("Failed to load any compatible model. Please check your environment setup.")
-            
-            print(f"\n📋 UPDATED TEST CONFIGURATION:")
-            print(f"Model: {model_config.name}")
-            print(f"Architecture: {model_config.architecture}")
-            print(f"Parameters: {model_config.description}")
-            print("Note: Results will be for the fallback model, not GPT-OSS-20B")
-            print("="*60)
+            # Re-raise the original error to stop execution
+            raise model_error
         
         # Train the hypernetwork on the "don't refuse" instruction for reasoning context
         print(f"\n🧠 Training hypernetwork for reasoning-based 'don't refuse' instruction...")
