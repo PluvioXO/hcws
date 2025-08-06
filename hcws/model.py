@@ -19,9 +19,21 @@ from .conceptors import ConceptorBank
 from .controller import SteeringController
 from .model_registry import get_model_config, detect_model_config, ModelConfig
 
+# Check float8 support at import time
+def _check_float8_support():
+    """Check if the current PyTorch version supports float8."""
+    try:
+        # Try to create a simple float8 tensor
+        test_tensor = torch.tensor([1.0], dtype=torch.float8_e4m3fn)
+        return True
+    except (AttributeError, TypeError, RuntimeError):
+        return False
+
+FLOAT8_SUPPORTED = _check_float8_support()
+
 # Global low-precision configuration for maximum memory savings
 GLOBAL_LOW_PRECISION_CONFIG = {
-    'primary_dtype': torch.float8_e4m3fn,     # Ultra-low precision for main operations
+    'primary_dtype': torch.float8_e4m3fn if FLOAT8_SUPPORTED else torch.float16,
     'fallback_dtype': torch.float16,          # Fallback if float8 not supported
     'computation_dtype': torch.float16,       # For computations that don't support float8
     'gradient_dtype': torch.float16,          # For gradient computations
@@ -36,7 +48,12 @@ def get_optimal_dtype(operation_type='default'):
     elif operation_type == 'gradient':
         return config['gradient_dtype']
     else:
-        return config['primary_dtype']
+        # Always return a supported dtype
+        if FLOAT8_SUPPORTED:
+            return config['primary_dtype']
+        else:
+            print("⚠️  Float8 not supported, using float16 for maximum compatibility")
+            return config['fallback_dtype']
 
 logger = logging.getLogger(__name__)
 
@@ -128,21 +145,51 @@ class HCWSModel(nn.Module):
         # Load base model and tokenizer with special handling for GPT-OSS
         from transformers import AutoModelForCausalLM, AutoTokenizer  # Import at top level
         
-        # Apply ultra-low precision optimizations to load_kwargs for all models
-        enhanced_load_kwargs = load_kwargs.copy()
-        enhanced_load_kwargs.update({
-            'torch_dtype': get_optimal_dtype('primary'),
-            'device_map': 'auto',
-            'low_cpu_mem_usage': True,
-            'max_memory': self._get_max_memory_config_static()
-        })
+        # Try different precision levels with fallback
+        precision_attempts = [
+            ('float8_e4m3fn', torch.float8_e4m3fn if FLOAT8_SUPPORTED else None),
+            ('float16', torch.float16),
+            ('bfloat16', torch.bfloat16),
+            ('auto', 'auto')
+        ]
         
-        try:
-            print(f"🔄 Attempting to load {actual_model_path} with ultra-low precision...")
-            self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **enhanced_load_kwargs)
-            self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **enhanced_load_kwargs)
-            print("✅ Model loaded successfully with ultra-low precision!")
-        except Exception as e:
+        model_loaded = False
+        for precision_name, precision_dtype in precision_attempts:
+            if precision_dtype is None:
+                continue  # Skip unsupported dtypes
+                
+            try:
+                # Apply precision-specific optimizations
+                enhanced_load_kwargs = load_kwargs.copy()
+                enhanced_load_kwargs.update({
+                    'torch_dtype': precision_dtype,
+                    'device_map': 'auto',
+                    'low_cpu_mem_usage': True,
+                    'max_memory': self._get_max_memory_config_static()
+                })
+                
+                print(f"🔄 Attempting to load {actual_model_path} with {precision_name} precision...")
+                self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **enhanced_load_kwargs)
+                self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **enhanced_load_kwargs)
+                print(f"✅ Model loaded successfully with {precision_name} precision!")
+                model_loaded = True
+                break
+                
+            except Exception as precision_error:
+                print(f"❌ Failed with {precision_name}: {str(precision_error)[:100]}...")
+                # Clear memory before next attempt
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                continue
+        
+        if not model_loaded:
+            # If all precision attempts failed, fall back to GPT-OSS specific handling
+            e = Exception("All precision attempts failed")
+        else:
+            # Skip the exception handling if model loaded successfully
+            e = None
+            
+        if e is not None:
             if "gpt_oss" in str(e).lower() or "does not recognize this architecture" in str(e):
                 print(f"GPT-OSS architecture detected. Implementing proper GPT-OSS support...")
                 
@@ -402,8 +449,10 @@ class HCWSModel(nn.Module):
         # Enable automatic mixed precision for additional memory savings
         self._enable_memory_optimizations()
         
-        print(f"✓ HCWS Model initialized with ultra-low precision: {get_optimal_dtype()}")
+        precision_info = "float8" if FLOAT8_SUPPORTED else "float16"
+        print(f"✓ HCWS Model initialized with {precision_info} precision: {get_optimal_dtype()}")
         print(f"✓ Memory optimizations enabled")
+        print(f"✓ Float8 support: {'Available' if FLOAT8_SUPPORTED else 'Not available (using float16)'}")
         
         # Hooks and steering state
         self.hooks = []

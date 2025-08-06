@@ -108,7 +108,7 @@ MODEL_REGISTRY = {
         layer_attr_path=["model", "layers"],
         default_steering_strength=2.0,
         requires_trust_remote_code=True,
-        torch_dtype="float8_e4m3fn",  # Use ultra-low precision for maximum memory savings
+        torch_dtype="float16",  # Use float16 for maximum compatibility (float8 if supported)
         description="DeepSeek-V3-0324 (671B parameters, MoE)"
     ),
     "deepseek-v2.5": ModelConfig(
