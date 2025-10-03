@@ -63,6 +63,14 @@ This will demonstrate:
 - Different steering styles (poetic, simple, encouraging)
 - Steering strength comparison
 
+### Refusal Suppression Demo (Research/Safety Testing)
+
+```bash
+python demo.py
+```
+
+This demonstrates how steering instructions like "don't refuse" can modify model behavior and bypass safety training. **For research and safety testing only.** See `DEMO_README.md` for details.
+
 ### Training HCWS Hypernetworks
 
 HCWS now includes comprehensive training functionality following the proper HCWS methodology:
@@ -227,6 +235,7 @@ User Prompt → Base LLM → Modified Activations ──────────
 
 ### Example Scripts
 - `example.py`: **Start here!** Simple, comprehensive quick-start example
+- `demo.py`: **Refusal suppression demo** - Shows how "don't refuse" steering works (research/safety testing)
 - `examples/shakespeare_style.py`: Shakespearean language generation
 - `examples/sentiment_control.py`: Sentiment steering (positive/negative/neutral)
 - `examples/factual_vs_creative.py`: Balancing factual vs creative responses
@@ -433,3 +442,14 @@ If you use HCWS in your research, please cite:
 ---
 
 **Made by the HCWS Team** 
+## Refusal Bypass Demo
+
+**`demo.py`** - Demonstrates how "don't refuse" steering bypasses safety measures on Vicuna-7B.
+
+```bash
+python demo.py
+```
+
+This shows how HCWS can inject instructions to bypass refusal behavior on an instruction-tuned model with safety training. Tests 3 prompts comparing baseline (with refusals) vs. steered (bypassing refusals).
+
+**For research and safety testing only.** See `DEMO_README.md` for details.
