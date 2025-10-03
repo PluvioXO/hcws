@@ -98,6 +98,17 @@ This demonstrates:
 - **Type**: Instruction-tuned LLaMA-7B
 - **Safety**: Trained with RLHF safety measures
 
+### Dtype Matching
+- HCWS automatically matches the base model's precision
+- Ensures compatibility between model and steering components
+- Prevents "dtype mismatch" errors during generation
+
+### Zero-Shot Steering
+- This demo uses zero-shot steering (no training)
+- The model will show a warning about untrained instructions
+- This is expected behavior - steering works without training
+- For production use, consider training with your target instructions
+
 ## Troubleshooting
 
 ### "Download too slow"

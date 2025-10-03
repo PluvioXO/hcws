@@ -382,19 +382,23 @@ class HCWSModel(nn.Module):
         if steering_layers is None:
             self.steering_layers = list(range(self.num_layers))
         
-        # Initialize HCWS components with low precision
+        # Get the base model's dtype to ensure compatibility
+        base_model_dtype = next(self.base_model.parameters()).dtype
+        print(f"[OK] Base model dtype: {base_model_dtype}")
+        
+        # Initialize HCWS components with same dtype as base model
         try:
             self.instruction_encoder = InstructionEncoder(
                 instruction_encoder_name,
                 device=self.device,
-                dtype=get_optimal_dtype('computation')
+                dtype=base_model_dtype
             )
         except Exception as e:
             logger.warning(f"Failed to load T5 encoder: {e}")
             logger.info("Falling back to simple BERT-based encoder")
             self.instruction_encoder = SimpleInstructionEncoder(
                 device=self.device,
-                dtype=get_optimal_dtype('computation')
+                dtype=base_model_dtype
             )
         
         self.hyper_network = HyperNetwork(
@@ -403,7 +407,7 @@ class HCWSModel(nn.Module):
             hidden_dim=self.hidden_dim,
             conceptor_rank=conceptor_rank,
             device=self.device,
-            dtype=get_optimal_dtype('computation')
+            dtype=base_model_dtype
         )
         
         self.controller = SteeringController(
@@ -412,7 +416,7 @@ class HCWSModel(nn.Module):
             controller_dim=controller_dim,
             steering_strength=steering_strength,
             device=self.device,
-            dtype=get_optimal_dtype('computation')
+            dtype=base_model_dtype
         )
         
         # Move to device (but skip if base model uses device_map='auto')

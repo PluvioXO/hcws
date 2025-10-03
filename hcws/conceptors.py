@@ -90,10 +90,15 @@ class Conceptor(nn.Module):
             Transformed tensor [..., hidden_dim]
         """
         original_shape = x.shape
+        original_dtype = x.dtype
         x_flat = x.view(-1, self.hidden_dim)
         
         # Get conceptor matrix
         C = self.get_matrix()
+        
+        # Ensure dtype consistency
+        if C.dtype != x_flat.dtype:
+            C = C.to(x_flat.dtype)
         
         # Apply conceptor
         output = torch.mm(x_flat, C.t())

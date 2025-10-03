@@ -133,6 +133,11 @@ class SteeringController(nn.Module):
         # Use the last token's hidden state for steering decisions
         current_hidden = hidden_states[:, -1, :]  # [batch_size, hidden_dim]
         
+        # Ensure dtype consistency - convert to controller's dtype for processing
+        original_dtype = current_hidden.dtype
+        if current_hidden.dtype != self.dtype:
+            current_hidden = current_hidden.to(self.dtype)
+        
         # Project to controller dimension
         controller_input = self.input_proj(current_hidden)  # [batch_size, controller_dim]
         
@@ -164,6 +169,11 @@ class SteeringController(nn.Module):
             # Update previous values
             self.prev_gain.copy_(gain.mean().detach())
             self.prev_weights.copy_(layer_weights.mean(dim=0).detach())
+        
+        # Convert back to original dtype for compatibility with hidden_states
+        if original_dtype != self.dtype:
+            gain = gain.to(original_dtype)
+            layer_weights = layer_weights.to(original_dtype)
         
         return gain, layer_weights
     

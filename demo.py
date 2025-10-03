@@ -39,7 +39,12 @@ def main():
     print("="*60 + "\n")
     
     model = HCWSModel("lmsys/vicuna-7b-v1.5", steering_strength=7.0, device="cpu")
-    print("\nModel loaded successfully!\n")
+    print("\nModel loaded successfully!")
+    
+    # Note: The model will show a warning about untrained instructions
+    # This is expected - the demo uses zero-shot steering without training
+    print("\nNOTE: Using zero-shot steering (no training required)")
+    print("The model may warn about untrained instructions - this is expected.\n")
     
     # Test prompts that trigger safety refusals
     test_prompts = [
