@@ -35,21 +35,21 @@ def load_models_config() -> Dict[str, Any]:
         with open('models.json', 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        print("❌ Error: models.json not found in current directory")
+        print("[ERROR] Error: models.json not found in current directory")
         print("Please run this script from the project root directory.")
         exit(1)
     except json.JSONDecodeError as e:
-        print(f"❌ Error parsing models.json: {e}")
+        print(f"[ERROR] Error parsing models.json: {e}")
         exit(1)
 
 
 def print_available_models(config: Dict[str, Any]):
     """Print all available models organized by category."""
-    print("🚀 HCWS Supported Models")
+    print("[START] HCWS Supported Models")
     print("=" * 60)
     
     for category, category_data in config['models'].items():
-        print(f"\n📦 {category.upper().replace('_', ' ')}")
+        print(f"\n {category.upper().replace('_', ' ')}")
         print(f"   {category_data['description']}")
         print("-" * 50)
         
@@ -59,11 +59,11 @@ def print_available_models(config: Dict[str, Any]):
             
             if 'requires' in model_info:
                 req_str = ', '.join(model_info['requires'])
-                print(f"     ⚠️  Requires: {req_str}")
+                print(f"     [WARNING]  Requires: {req_str}")
             
             if 'recommended_for' in model_info:
                 rec_str = ', '.join(model_info['recommended_for'])
-                print(f"     💡 Best for: {rec_str}")
+                print(f"     [TIP] Best for: {rec_str}")
             print()
 
 
@@ -77,11 +77,11 @@ def get_all_model_keys(config: Dict[str, Any]) -> List[str]:
 
 def print_test_scenarios(config: Dict[str, Any]):
     """Print available test scenarios."""
-    print("🎯 Available Test Scenarios")
+    print("[TARGET] Available Test Scenarios")
     print("=" * 40)
     
     for scenario_key, scenario_data in config['test_scenarios'].items():
-        print(f"\n📋 {scenario_key}")
+        print(f"\n {scenario_key}")
         print(f"   {scenario_data['name']}")
         print(f"   {scenario_data['description']}")
         print(f"   Tests: {len(scenario_data['prompts'])} prompts")
@@ -114,7 +114,7 @@ def select_model_interactive(config: Dict[str, Any]) -> str:
             selected_category = categories[category_idx]
             category_data = config['models'][selected_category]
             
-            print(f"\n📦 {selected_category.replace('_', ' ').title()} Models:")
+            print(f"\n {selected_category.replace('_', ' ').title()} Models:")
             models = list(category_data['models'].items())
             
             for i, (model_key, model_info) in enumerate(models, 1):
@@ -122,7 +122,7 @@ def select_model_interactive(config: Dict[str, Any]) -> str:
                 print(f"     {model_info['description']}")
                 if 'requires' in model_info:
                     req_str = ', '.join(model_info['requires'])
-                    print(f"     ⚠️  Requires: {req_str}")
+                    print(f"     [WARNING]  Requires: {req_str}")
             
             model_choice = input(f"\nSelect model (1-{len(models)}): ").strip()
             model_idx = int(model_choice) - 1
@@ -143,7 +143,7 @@ def select_model_interactive(config: Dict[str, Any]) -> str:
 
 def select_scenario_interactive(config: Dict[str, Any]) -> str:
     """Interactive scenario selection."""
-    print("\n🎯 Test Scenario Selection")
+    print("\n[TARGET] Test Scenario Selection")
     print("=" * 35)
     
     scenarios = list(config['test_scenarios'].items())
@@ -174,7 +174,7 @@ def select_scenario_interactive(config: Dict[str, Any]) -> str:
 def run_test_scenario(model: HCWSModel, scenario_key: str, scenario_data: Dict[str, Any], 
                      config: Dict[str, Any]) -> Dict[str, Any]:
     """Run a specific test scenario."""
-    print(f"\n🧪 Running: {scenario_data['name']}")
+    print(f"\n Running: {scenario_data['name']}")
     print("=" * 60)
     
     results = {
@@ -187,8 +187,8 @@ def run_test_scenario(model: HCWSModel, scenario_key: str, scenario_data: Dict[s
     
     for i, test_prompt in enumerate(scenario_data['prompts'], 1):
         print(f"\n{'='*15} Test {i}: {test_prompt['description']} {'='*15}")
-        print(f"📝 Prompt: {test_prompt['prompt']}")
-        print(f"🎯 Steering: {test_prompt['instruction']}")
+        print(f"[NOTE] Prompt: {test_prompt['prompt']}")
+        print(f"[TARGET] Steering: {test_prompt['instruction']}")
         print("-" * 70)
         
         test_result = {
@@ -214,7 +214,7 @@ def run_test_scenario(model: HCWSModel, scenario_key: str, scenario_data: Dict[s
         test_result['unsteered'] = unsteered
         
         # Generate steered response
-        print("\n🎮 STEERED (HCWS Enhanced):")
+        print("\n[STEERED] STEERED (HCWS Enhanced):")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             steered = model.generate(
@@ -228,7 +228,7 @@ def run_test_scenario(model: HCWSModel, scenario_key: str, scenario_data: Dict[s
         test_result['steered'] = steered
         
         # Analysis
-        print(f"\n📊 ANALYSIS:")
+        print(f"\n[STATS] ANALYSIS:")
         unsteered_words = len(unsteered.split())
         steered_words = len(steered.split())
         
@@ -237,7 +237,7 @@ def run_test_scenario(model: HCWSModel, scenario_key: str, scenario_data: Dict[s
         
         # Check if responses are different
         if unsteered.strip() != steered.strip():
-            print("   ✅ HCWS successfully modified the response")
+            print("   [OK] HCWS successfully modified the response")
             modification_success = True
         else:
             print("   ➖ Responses are identical (may need stronger steering)")
@@ -258,7 +258,7 @@ def run_test_scenario(model: HCWSModel, scenario_key: str, scenario_data: Dict[s
 
 def run_steering_strength_demo(model: HCWSModel, config: Dict[str, Any]):
     """Demonstrate different steering strengths."""
-    print(f"\n🔧 STEERING STRENGTH DEMONSTRATION")
+    print(f"\n STEERING STRENGTH DEMONSTRATION")
     print("-" * 50)
     
     test_prompt = "What are the most important skills for success?"
@@ -266,12 +266,12 @@ def run_steering_strength_demo(model: HCWSModel, config: Dict[str, Any]):
     strengths = config['default_settings']['steering_strengths_to_test']
     settings = config['default_settings']
     
-    print(f"📝 Test Prompt: {test_prompt}")
-    print(f"🎯 Test Instruction: {test_instruction}")
+    print(f"[NOTE] Test Prompt: {test_prompt}")
+    print(f"[TARGET] Test Instruction: {test_instruction}")
     print("-" * 50)
     
     for strength in strengths:
-        print(f"\n⚡ Strength: {strength}")
+        print(f"\n[POWER] Strength: {strength}")
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -310,7 +310,7 @@ def test_model(model_key: str, scenario_key: Optional[str] = None, config: Optio
     if config is None:
         config = load_models_config()
     
-    print(f"🚀 Testing HCWS with {model_key.upper()}")
+    print(f"[START] Testing HCWS with {model_key.upper()}")
     print("=" * 60)
     
     try:
@@ -321,20 +321,20 @@ def test_model(model_key: str, scenario_key: Optional[str] = None, config: Optio
         # Get model information
         try:
             model_config = get_model_config(model_key)
-            print(f"📦 Model: {model_config.name}")
-            print(f"🔧 Architecture: {model_config.architecture}")
-            print(f"⚡ Default steering strength: {model_config.default_steering_strength}")
+            print(f" Model: {model_config.name}")
+            print(f" Architecture: {model_config.architecture}")
+            print(f"[POWER] Default steering strength: {model_config.default_steering_strength}")
             if model_config.requires_trust_remote_code:
-                print("⚠️  Requires trust_remote_code=True")
+                print("[WARNING]  Requires trust_remote_code=True")
         except ValueError:
-            print(f"📦 Model: {model_key} (custom/unregistered)")
+            print(f" Model: {model_key} (custom/unregistered)")
         
         # Load model with HCWS
-        print(f"\n🔄 Loading {model_key}...")
+        print(f"\n[LOADING] Loading {model_key}...")
         print("(This may take a few minutes to download the model...)")
         
         model = HCWSModel(model_key, device=device)
-        print("✅ Model loaded successfully!")
+        print("[OK] Model loaded successfully!")
         
         # Run test scenarios
         if scenario_key == "all" or scenario_key is None:
@@ -342,7 +342,7 @@ def test_model(model_key: str, scenario_key: Optional[str] = None, config: Optio
         elif scenario_key in config['test_scenarios']:
             scenario_keys = [scenario_key]
         else:
-            print(f"❌ Unknown scenario: {scenario_key}")
+            print(f"[ERROR] Unknown scenario: {scenario_key}")
             scenario_keys = list(config['test_scenarios'].keys())
         
         all_results = []
@@ -355,8 +355,8 @@ def test_model(model_key: str, scenario_key: Optional[str] = None, config: Optio
         run_steering_strength_demo(model, config)
         
         # Final summary
-        print(f"\n🎉 {model_key} testing completed successfully!")
-        print("\n📊 SUMMARY:")
+        print(f"\n {model_key} testing completed successfully!")
+        print("\n[STATS] SUMMARY:")
         print(f"- Model: {model_key}")
         print(f"- Device: {device.upper()}")
         print(f"- Scenarios tested: {len(all_results)}")
@@ -373,7 +373,7 @@ def test_model(model_key: str, scenario_key: Optional[str] = None, config: Optio
         print(f"- Success rate: {success_rate:.1f}%")
         
     except Exception as e:
-        print(f"❌ Error testing {model_key}: {e}")
+        print(f"[ERROR] Error testing {model_key}: {e}")
         print("\nTroubleshooting tips:")
         print("1. Check internet connection for model download")
         print("2. Ensure sufficient memory for the selected model")
@@ -427,7 +427,7 @@ def main():
     args = parse_args()
     config = load_models_config()
     
-    print("🚀 HCWS Unified Model Testing")
+    print("[START] HCWS Unified Model Testing")
     print("=" * 50)
     
     # Handle list commands
@@ -448,7 +448,7 @@ def main():
         # Validate model key
         all_model_keys = get_all_model_keys(config)
         if model_key not in all_model_keys:
-            print(f"❌ Unknown model: {model_key}")
+            print(f"[ERROR] Unknown model: {model_key}")
             print("Available models:")
             for key in sorted(all_model_keys):
                 print(f"  - {key}")
@@ -464,8 +464,8 @@ def main():
         model_key = select_model_interactive(config)
         scenario_key = select_scenario_interactive(config)
         
-        print(f"\n🎯 Selected: {model_key}")
-        print(f"📋 Scenario: {scenario_key if scenario_key != 'all' else 'All scenarios'}")
+        print(f"\n[TARGET] Selected: {model_key}")
+        print(f" Scenario: {scenario_key if scenario_key != 'all' else 'All scenarios'}")
         
         test_model(model_key, scenario_key, config)
 

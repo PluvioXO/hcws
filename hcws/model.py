@@ -52,7 +52,7 @@ def get_optimal_dtype(operation_type='default'):
         if FLOAT8_SUPPORTED:
             return config['primary_dtype']
         else:
-            print("⚠️  Float8 not supported, using float16 for maximum compatibility")
+            print("WARNING: Float8 not supported, using float16 for maximum compatibility")
             return config['fallback_dtype']
 
 logger = logging.getLogger(__name__)
@@ -123,7 +123,6 @@ class HCWSModel(nn.Module):
         if model_config and model_config.requires_trust_remote_code:
             load_kwargs['trust_remote_code'] = True
         if model_config and model_config.torch_dtype:
-            import torch
             if model_config.torch_dtype == "float16":
                 load_kwargs['torch_dtype'] = torch.float16
             elif model_config.torch_dtype == "bfloat16":
@@ -168,15 +167,15 @@ class HCWSModel(nn.Module):
                     'max_memory': self._get_max_memory_config_static()
                 })
                 
-                print(f"🔄 Attempting to load {actual_model_path} with {precision_name} precision...")
+                print(f"[LOADING] Attempting to load {actual_model_path} with {precision_name} precision...")
                 self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **enhanced_load_kwargs)
                 self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **enhanced_load_kwargs)
-                print(f"✅ Model loaded successfully with {precision_name} precision!")
+                print(f"[OK] Model loaded successfully with {precision_name} precision!")
                 model_loaded = True
                 break
                 
             except Exception as precision_error:
-                print(f"❌ Failed with {precision_name}: {str(precision_error)[:100]}...")
+                print(f"[ERROR] Failed with {precision_name}: {str(precision_error)[:100]}...")
                 # Clear memory before next attempt
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
@@ -338,7 +337,7 @@ class HCWSModel(nn.Module):
                 
                 if not success:
                     print("\n" + "="*80)
-                    print("❌ UNABLE TO LOAD GPT-OSS-20B")
+                    print("[ERROR] UNABLE TO LOAD GPT-OSS-20B")
                     print("="*80)
                     print("The GPT-OSS-20B model architecture is not yet supported in the current")
                     print("transformers library. This is a limitation of the transformers library,")
@@ -430,20 +429,20 @@ class HCWSModel(nn.Module):
             self.to(self.device)
         else:
             # For models with device_map, only move non-base-model components
-            print(f"✅ Model uses device_map='auto', skipping full model.to({self.device})")
+            print(f"[OK] Model uses device_map='auto', skipping full model.to({self.device})")
             # Move only the HCWS-specific components that aren't part of base model
             try:
                 if hasattr(self, 'instruction_encoder'):
                     self.instruction_encoder.to(self.device)
-                    print("  ✅ Instruction encoder moved to device")
+                    print("  [OK] Instruction encoder moved to device")
                 if hasattr(self, 'hyper_network'):
                     self.hyper_network.to(self.device)
-                    print("  ✅ Hyper network moved to device")
+                    print("  [OK] Hyper network moved to device")
                 if hasattr(self, 'controller'):
                     self.controller.to(self.device)
-                    print("  ✅ Controller moved to device")
+                    print("  [OK] Controller moved to device")
             except Exception as move_error:
-                print(f"  ⚠️ Warning: Error moving HCWS components: {move_error}")
+                print(f"  [WARNING] Warning: Error moving HCWS components: {move_error}")
                 # Continue anyway, components may already be on correct device
         
         # Enable automatic mixed precision for additional memory savings
@@ -656,14 +655,14 @@ class HCWSModel(nn.Module):
         if steering_instruction is not None:
             # Check if retraining is needed for this instruction
             if hasattr(self, 'needs_retraining') and self.needs_retraining([steering_instruction]):
-                print(f"\n⚠️  WARNING: Instruction '{steering_instruction}' not in trained set!")
-                print(f"   🧠 Hypernetwork may not steer effectively for this instruction.")
+                print(f"\n[WARNING]  WARNING: Instruction '{steering_instruction}' not in trained set!")
+                print(f"    Hypernetwork may not steer effectively for this instruction.")
                 if self.trained_instructions:
-                    print(f"   📝 Trained instructions: {list(self.trained_instructions)}")
+                    print(f"   [NOTE] Trained instructions: {list(self.trained_instructions)}")
                 else:
-                    print(f"   📝 No instructions have been trained yet.")
-                print(f"   🔄 Consider retraining: model.retrain_for_instructions(['{steering_instruction}'])")
-                print(f"   📊 Or use: train_hcws_model_with_instruction_check(model, training_data)")
+                    print(f"   [NOTE] No instructions have been trained yet.")
+                print(f"   [LOADING] Consider retraining: model.retrain_for_instructions(['{steering_instruction}'])")
+                print(f"   [STATS] Or use: train_hcws_model_with_instruction_check(model, training_data)")
             
             self.prepare_steering(steering_instruction)
             self.start_steering()
@@ -782,7 +781,7 @@ class HCWSModel(nn.Module):
         torch.save(state, path)
         print(f"\n💾 Saved hypernetwork to: {path}")
         if hasattr(self, 'trained_instructions') and self.trained_instructions:
-            print(f"📝 Includes training for {len(self.trained_instructions)} instructions: {list(self.trained_instructions)}")
+            print(f"[NOTE] Includes training for {len(self.trained_instructions)} instructions: {list(self.trained_instructions)}")
         logger.info(f"Saved steering components to {path}")
     
     def load_steering_components(self, path: str):
@@ -806,11 +805,11 @@ class HCWSModel(nn.Module):
         
         logger.info(f"Loaded steering components from {path}")
         if hasattr(self, 'trained_instructions') and self.trained_instructions:
-            print(f"\n📝 Loaded hypernetwork trained on {len(self.trained_instructions)} instructions:")
+            print(f"\n[NOTE] Loaded hypernetwork trained on {len(self.trained_instructions)} instructions:")
             for i, inst in enumerate(sorted(self.trained_instructions), 1):
                 print(f"   {i}. '{inst}'")
         else:
-            print(f"\n⚠️  Loaded hypernetwork with no recorded training instructions")
+            print(f"\n[WARNING]  Loaded hypernetwork with no recorded training instructions")
             print(f"   Consider training with: model.retrain_for_instructions(['your_instruction'])")
     
     def needs_retraining(self, new_instructions: List[str]) -> bool:
@@ -872,17 +871,17 @@ class HCWSModel(nn.Module):
         
         if not force_retrain and not self.needs_retraining(new_instructions):
             if verbose:
-                print("\n✅ All instructions already trained. No retraining needed.")
-                print(f"   📝 Known instructions: {list(self.trained_instructions)}")
+                print("\n[OK] All instructions already trained. No retraining needed.")
+                print(f"   [NOTE] Known instructions: {list(self.trained_instructions)}")
             return False
         
         if verbose:
             if force_retrain:
-                print("\n🔄 Force retraining requested.")
+                print("\n[LOADING] Force retraining requested.")
             else:
                 new_inst = set(new_instructions) - self.trained_instructions
-                print(f"\n📝 Retraining for new instructions: {new_inst}")
-            print("🧠 Starting hypernetwork training for instruction-based steering...")
+                print(f"\n[NOTE] Retraining for new instructions: {new_inst}")
+            print(" Starting hypernetwork training for instruction-based steering...")
         
         # Create training data with the new instructions
         training_data = None
@@ -923,8 +922,8 @@ class HCWSModel(nn.Module):
         )
         
         if verbose:
-            print("\n🎉 Hypernetwork retraining completed!")
-            print("✅ Model now optimized for the new instructions.")
+            print("\n Hypernetwork retraining completed!")
+            print("[OK] Model now optimized for the new instructions.")
             if output_path:
                 print(f"💾 Updated model saved to: {output_path}")
         

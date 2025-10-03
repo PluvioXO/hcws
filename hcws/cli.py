@@ -251,16 +251,16 @@ def cmd_train(args):
         )
         
         if verbose:
-            print("\n🎉 HYPERNETWORK TRAINING COMPLETED SUCCESSFULLY!")
+            print("\n HYPERNETWORK TRAINING COMPLETED SUCCESSFULLY!")
             print("=" * 60)
             if output_path:
                 print(f"💾 Trained hypernetwork saved to: {output_path}")
-            print(f"\n🚀 Your HCWS model is now ready for use:")
+            print(f"\n[START] Your HCWS model is now ready for use:")
             print(f"   from hcws import HCWSModel")
             print(f"   model = HCWSModel('{args.model}')")
             if output_path:
                 print(f"   model.load_steering_components('{output_path}')")
-            print(f"\n🎯 The hypernetwork can now generate effective conceptors for steering!")
+            print(f"\n[TARGET] The hypernetwork can now generate effective conceptors for steering!")
         
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")

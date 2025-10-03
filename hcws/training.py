@@ -391,10 +391,10 @@ def train_hcws_model(
                 print(f"All instructions already trained, but continuing training anyway...")
     
     if verbose:
-        print("\n🧠 HCWS HYPERNETWORK TRAINING")
+        print("\n HCWS HYPERNETWORK TRAINING")
         print("=" * 60)
-        print("🎯 Training hypernetwork to generate conceptors for instructions...")
-        print(f"📊 Training Configuration:")
+        print("[TARGET] Training hypernetwork to generate conceptors for instructions...")
+        print(f"[STATS] Training Configuration:")
         print(f"   • Positive examples: {len(positive_examples)}")
         print(f"   • Negative examples: {len(negative_examples)}")
         print(f"   • Unique instructions: {len(all_training_instructions)}")
@@ -409,7 +409,7 @@ def train_hcws_model(
         print(f"   • Controller: TRAINING (learning steering control)")
         
         if all_training_instructions:
-            print(f"\n📝 Instructions to Learn:")
+            print(f"\n[NOTE] Instructions to Learn:")
             for i, inst in enumerate(sorted(all_training_instructions), 1):
                 print(f"   {i}. '{inst}'")
         print("=" * 60)
@@ -608,7 +608,7 @@ def train_hcws_model(
             torch.save(state_dict, save_path)
             if verbose:
                 print(f"💾 Hypernetwork saved to: {save_path}")
-                print(f"✅ Training state preserved for future use")
+                print(f"[OK] Training state preserved for future use")
         except Exception as e:
             logger.error(f"Error saving model: {e}")
     
@@ -842,16 +842,16 @@ def train_hcws_model_with_instruction_check(
         if verbose:
             if needs_training:
                 new_instructions = set(training_instructions_list) - model.trained_instructions
-                print("\n📝 NEW INSTRUCTIONS DETECTED:")
+                print("\n[NOTE] NEW INSTRUCTIONS DETECTED:")
                 print("=" * 40)
                 for inst in new_instructions:
                     print(f"   • '{inst}'")
-                print(f"\n🔄 RETRAINING REQUIRED - Hypernetwork needs to learn these instructions")
+                print(f"\n[LOADING] RETRAINING REQUIRED - Hypernetwork needs to learn these instructions")
                 if model.trained_instructions:
                     print(f"   Already trained on: {list(model.trained_instructions)}")
                 print("   Starting hypernetwork retraining...")
             else:
-                print("\n✅ ALL INSTRUCTIONS ALREADY TRAINED:")
+                print("\n[OK] ALL INSTRUCTIONS ALREADY TRAINED:")
                 print("=" * 40)
                 for inst in training_instructions_list:
                     print(f"   • '{inst}'")
@@ -917,10 +917,10 @@ def model_train(
         device = get_device()
     
     if verbose:
-        print("\n🧠 HCWS MODEL TRAINING")
+        print("\n HCWS MODEL TRAINING")
         print("=" * 60)
-        print("🎯 Training hypernetwork for instruction-based steering")
-        print(f"\n📊 Configuration:")
+        print("[TARGET] Training hypernetwork for instruction-based steering")
+        print(f"\n[STATS] Configuration:")
         print(f"   • Base model: {model_name_or_path}")
         print(f"   • Device: {device.upper()}")
         if training_data_path:
@@ -937,8 +937,8 @@ def model_train(
     
     # Initialize model
     if verbose:
-        print("\n🔧 INITIALIZING HCWS MODEL...")
-        print("📋 Loading base model and setting up HCWS components")
+        print("\n INITIALIZING HCWS MODEL...")
+        print(" Loading base model and setting up HCWS components")
     
     model = HCWSModel(
         model_name_or_path,
@@ -947,15 +947,15 @@ def model_train(
     )
     
     if verbose:
-        print("✅ Model initialized successfully!")
+        print("[OK] Model initialized successfully!")
         print(f"   • Base model loaded: {model_name_or_path}")
         print(f"   • Hypernetwork ready for training")
         print(f"   • Controller ready for training")
     
     # Train model
     if verbose:
-        print("\n🚀 STARTING HYPERNETWORK TRAINING...")
-        print("🔄 Training hypernetwork to map instructions to effective conceptors")
+        print("\n[START] STARTING HYPERNETWORK TRAINING...")
+        print("[LOADING] Training hypernetwork to map instructions to effective conceptors")
     
     history = train_hcws_model(
         model=model,
@@ -973,8 +973,8 @@ def model_train(
     
     # Quick evaluation
     if verbose:
-        print("\n📋 RUNNING POST-TRAINING EVALUATION...")
-        print("📊 Testing hypernetwork steering effectiveness")
+        print("\n RUNNING POST-TRAINING EVALUATION...")
+        print("[STATS] Testing hypernetwork steering effectiveness")
         evaluate_hcws_model(model, verbose=verbose)
     
     return model

@@ -23,6 +23,7 @@ var/
 .installed.cfg
 *.egg
 MANIFEST
+pip-wheel-metadata/
 
 # Installer logs
 pip-log.txt
@@ -119,7 +120,26 @@ transformers_cache/
 *.swp
 *.swo
 *~
+.idea/
+.vscode/
+*.iml
 
 # Ignore local notebooks and experiment logs
 notebooks/
-logs/ 
+logs/
+output/
+results/
+checkpoints/
+
+# Training data and models (optional - uncomment if needed)
+# *.json
+# trained_*.pt
+# example_training_data.json
+
+# OS specific
+Thumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.backup 

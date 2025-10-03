@@ -1,8 +1,67 @@
 # HCWS (Hyper-Conceptor Weighted Steering)
 
-A lightweight method for steering large language models using conceptor-based activation modification during inference.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+A lightweight, efficient method for steering large language models using conceptor-based activation modification during inference—**no retraining required**.
+
+> **Quick Start**: Run `python example.py` to see HCWS in action!
+
+## Features
+
+- **Zero-shot steering** - Control model behavior with natural language instructions
+- **No retraining needed** - Works with any pre-trained transformer model
+- **Flexible control** - Adjustable steering strength for fine-tuned results
+- **Easy to use** - Simple API, works in just a few lines of code
+- **Multi-platform** - Supports CPU, CUDA, Apple Silicon (MPS), and TPU
+- **Model agnostic** - Compatible with GPT-2, LLaMA, Qwen, Mistral, and more
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/PluvioXO/hcws.git
+cd hcws
+
+# Create virtual environment (recommended)
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install package in editable mode
+pip install -e .
+```
 
 ## Quick Start
+
+### Simplest Example (5 lines of code!)
+
+```python
+from hcws import HCWSModel
+
+model = HCWSModel("gpt2")
+output = model.generate(
+    "The future of AI is",
+    steering_instruction="be optimistic and enthusiastic",
+    max_length=50
+)
+print(output)
+```
+
+### Run the Quick Start Example
+
+```bash
+python example.py
+```
+
+This will demonstrate:
+- Basic steering vs unsteered generation
+- Different steering styles (poetic, simple, encouraging)
+- Steering strength comparison
 
 ### Training HCWS Hypernetworks
 
@@ -68,22 +127,7 @@ python test.py --model qwen2.5-1.5b
 python test.py --model deepseek-v3
 ```
 
-## Installation
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd hcws-1
-
-# Create virtual environment (recommended)
-python3.10 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-## Quick Start
+## Examples
 
 ### Basic Usage
 
@@ -164,19 +208,29 @@ print(f"Mean aperture: {metrics['mean_aperture']:.4f}")
 print(f"Aperture std: {metrics['aperture_std']:.4f}")
 ```
 
-## Components
+## Architecture
+
+HCWS uses a unique architecture that enables zero-shot steering:
+
+```
+Instruction → T5 Encoder → Hyper-Network → Conceptor Matrices → Steering Controller
+                                                                         ↓
+User Prompt → Base LLM → Modified Activations ──────────────────────────┘
+```
 
 ### Core Components
-- `hcws/encoder.py`: T5-based instruction encoder
-- `hcws/hyper_network.py`: Maps instruction vectors to conceptors
-- `hcws/conceptors.py`: Low-rank matrix operations for subspace definition
-- `hcws/controller.py`: Real-time steering controller with configurable strength
-- `hcws/model.py`: Main HCWS model wrapper
+- **Instruction Encoder** (`encoder.py`): T5-based encoder for natural language instructions
+- **Hyper-Network** (`hyper_network.py`): Maps instruction vectors to conceptor parameters
+- **Conceptor Bank** (`conceptors.py`): Low-rank matrices that define steering subspaces
+- **Steering Controller** (`controller.py`): Real-time activation modification with configurable strength
+- **Model Wrapper** (`model.py`): Main HCWS model that integrates all components
 
-### Examples
+### Example Scripts
+- `example.py`: **Start here!** Simple, comprehensive quick-start example
 - `examples/shakespeare_style.py`: Shakespearean language generation
-- `examples/sentiment_control.py`: Sentiment steering
+- `examples/sentiment_control.py`: Sentiment steering (positive/negative/neutral)
 - `examples/factual_vs_creative.py`: Balancing factual vs creative responses
+- `examples/train_example.py`: Training custom hypernetworks
 
 ## Method Details
 
@@ -319,19 +373,63 @@ model = HCWSModel("gpt2", device="tpu", torch_dtype=torch.bfloat16)
 - Monitor generation quality and adjust parameters accordingly
 - Test steering effects on diverse prompts before production use
 
-## Citation
+## Contributing
 
-If you use this code, please cite:
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on:
+- Setting up the development environment
+- Code style guidelines
+- Testing procedures
+- Submitting pull requests
 
-```bibtex
-@article{hcws2024,
-  title={Hyper-Conceptor Weighted Steering for Large Language Models},
-  author={[Authors]},
-  journal={[Journal]},
-  year={2025}
-}
+## Project Structure
+
+```
+hcws/
+├── hcws/              # Core package
+│   ├── model.py       # Main HCWS model
+│   ├── encoder.py     # Instruction encoder
+│   ├── conceptors.py  # Conceptor operations
+│   ├── controller.py  # Steering controller
+│   └── ...
+├── examples/          # Example scripts
+│   ├── shakespeare_style.py
+│   ├── sentiment_control.py
+│   └── ...
+├── tests/             # Unit tests
+├── example.py         # Quick start example (start here!)
+├── test.py            # Comprehensive testing interface
+├── demo.py            # Full demo with comparisons
+└── README.md
 ```
 
 ## License
 
-MIT License - see LICENSE file for details. 
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Citation
+
+If you use HCWS in your research, please cite:
+
+```bibtex
+@software{hcws2025,
+  title={HCWS: Hyper-Conceptor Weighted Steering for Large Language Models},
+  author={HCWS Team},
+  year={2025},
+  url={https://github.com/PluvioXO/hcws}
+}
+```
+
+## Acknowledgments
+
+- Built with [PyTorch](https://pytorch.org/) and [Transformers](https://huggingface.co/transformers/)
+- Inspired by research in neural network steering and conceptor theory
+- Thanks to all contributors and users!
+
+## Contact
+
+- **Issues**: [GitHub Issues](https://github.com/PluvioXO/hcws/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/PluvioXO/hcws/discussions)
+
+---
+
+**Made by the HCWS Team** 

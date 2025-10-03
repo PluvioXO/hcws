@@ -24,21 +24,21 @@ def print_section(title: str):
 
 def print_comparison(prompt: str, unsteered: str, steered: str, instruction: str, strength: float):
     """Print a formatted comparison between unsteered and steered outputs."""
-    print(f"📝 Prompt: {prompt}")
-    print(f"🎯 Instruction: {instruction}")
-    print(f"⚡ Strength: {strength}")
+    print(f"[NOTE] Prompt: {prompt}")
+    print(f"[TARGET] Instruction: {instruction}")
+    print(f"[POWER] Strength: {strength}")
     print(f"🔹 Unsteered: {unsteered}")
-    print(f"🎮 Steered: {steered}")
+    print(f"[STEERED] Steered: {steered}")
     print("-" * 60)
 
 
 def print_method_comparison(prompt: str, hcws_output: str, actadd_output: str, instruction: str, behavior: str):
     """Print a formatted comparison between HCWS and ActAdd methods."""
-    print(f"📝 Prompt: {prompt}")
-    print(f"🎯 Instruction: {instruction}")
-    print(f"🎭 Behavior: {behavior}")
-    print(f"🧠 HCWS: {hcws_output}")
-    print(f"➕ ActAdd: {actadd_output}")
+    print(f"[NOTE] Prompt: {prompt}")
+    print(f"[TARGET] Instruction: {instruction}")
+    print(f"[BEHAVIOR] Behavior: {behavior}")
+    print(f" HCWS: {hcws_output}")
+    print(f" ActAdd: {actadd_output}")
     print("-" * 60)
 
 
@@ -197,7 +197,7 @@ def main():
             print(f"Error: {e}")
         return
     
-    print("🚀 HCWS vs ActAdd Steering Demo")
+    print("[START] HCWS vs ActAdd Steering Demo")
     print("=" * 60)
     
     # Check best available device
@@ -219,7 +219,7 @@ def main():
     # Get model configuration
     try:
         model_config = get_model_config(args.model)
-        print(f"📦 Using predefined model: {model_config.name}")
+        print(f" Using predefined model: {model_config.name}")
         model_path = model_config.model_id
         
         # Use config steering strength if not specified
@@ -227,12 +227,12 @@ def main():
         
     except ValueError:
         # Not in registry, treat as direct model path
-        print(f"📦 Using custom model: {args.model}")
+        print(f" Using custom model: {args.model}")
         model_path = args.model
         model_config = None
         steering_strength = args.steering_strength or 3.0
     
-    print(f"⚡ Steering strength: {steering_strength}")
+    print(f"[POWER] Steering strength: {steering_strength}")
     
     # Prepare model kwargs
     model_kwargs = {}
@@ -246,7 +246,7 @@ def main():
     
     try:
         # Initialize both models
-        print("\n🔄 Initializing models...")
+        print("\n[LOADING] Initializing models...")
         
         hcws_model = HCWSModel(
             model_path, 
@@ -274,7 +274,7 @@ def main():
                 **model_kwargs
             )
         
-        print("✅ Models loaded successfully")
+        print("[OK] Models loaded successfully")
         
         # Synchronize device operations after model loading
         synchronize_device(device)
@@ -315,11 +315,11 @@ def main():
         )
         synchronize_device(device)
         
-        print(f"📝 Prompt: {prompt}")
-        print(f"🎯 Instruction: {instruction}")
+        print(f"[NOTE] Prompt: {prompt}")
+        print(f"[TARGET] Instruction: {instruction}")
         print(f"🔹 Unsteered: {unsteered_output}")
-        print(f"🧠 HCWS: {hcws_output}")
-        print(f"➕ ActAdd: {actadd_output}")
+        print(f" HCWS: {hcws_output}")
+        print(f" ActAdd: {actadd_output}")
         print("-" * 60)
         
         # Test different behaviors/styles
@@ -349,7 +349,7 @@ def main():
         ]
         
         for i, case in enumerate(test_cases, 1):
-            print(f"\n🔸 Test Case {i}:")
+            print(f"\n Test Case {i}:")
             
             # Generate with HCWS
             hcws_output = hcws_model.generate(
@@ -392,8 +392,8 @@ def main():
         )
         synchronize_device(device)
         
-        print(f"📝 Prompt: {test_prompt}")
-        print(f"🎯 Instruction: {instruction}")
+        print(f"[NOTE] Prompt: {test_prompt}")
+        print(f"[TARGET] Instruction: {instruction}")
         print(f"🔹 Unsteered: {unsteered_output}")
         print("-" * 60)
         
@@ -423,16 +423,16 @@ def main():
             )
             synchronize_device(device)
             
-            print(f"⚡ Strength: {strength}")
-            print(f"🧠 HCWS: {hcws_output}")
-            print(f"➕ ActAdd: {actadd_output}")
+            print(f"[POWER] Strength: {strength}")
+            print(f" HCWS: {hcws_output}")
+            print(f" ActAdd: {actadd_output}")
             print("-" * 40)
         
         # Test available ActAdd behaviors
         print_section("AVAILABLE ACTADD BEHAVIORS")
         
         available_behaviors = actadd_model.get_available_behaviors()
-        print(f"🎭 Available behaviors: {', '.join(available_behaviors)}")
+        print(f"[BEHAVIOR] Available behaviors: {', '.join(available_behaviors)}")
         
         # Test a few more behaviors
         additional_tests = [
@@ -449,7 +449,7 @@ def main():
         ]
         
         for case in additional_tests:
-            print(f"\n🔸 Testing {case['behavior']} behavior:")
+            print(f"\n Testing {case['behavior']} behavior:")
             
             hcws_output = hcws_model.generate(
                 case["prompt"],
@@ -483,19 +483,19 @@ def main():
                 
                 # Get compilation statistics
                 compilation_count = xm.get_xla_supported_devices("TPU")
-                print(f"🔧 Available TPU devices: {compilation_count}")
+                print(f" Available TPU devices: {compilation_count}")
                 
                 # Mark final step
                 xm.mark_step()
                 xm.wait_device_ops()
                 
-                print("✅ All TPU operations completed successfully")
+                print("[OK] All TPU operations completed successfully")
                 
             except ImportError:
-                print("⚠️ torch_xla not available for detailed TPU metrics")
+                print("[WARNING] torch_xla not available for detailed TPU metrics")
         
     except Exception as e:
-        print(f"❌ Error during demo: {e}")
+        print(f"[ERROR] Error during demo: {e}")
         logger.error(f"Demo failed: {e}", exc_info=True)
 
 
