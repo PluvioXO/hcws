@@ -8,6 +8,11 @@ on an instruction-tuned model with safety training.
 For research and safety testing purposes only.
 """
 
+# MUST set environment variables BEFORE importing torch/transformers
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Force CPU by hiding CUDA
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -36,6 +41,7 @@ def main():
     print("Loading Vicuna-7B model...")
     print("NOTE: First run will download ~13GB model (one-time only)")
     print("This may take 10-20 minutes depending on connection.")
+    print("NOTE: Running on CPU (no GPU required)")
     print("="*60 + "\n")
     
     model = HCWSModel("lmsys/vicuna-7b-v1.5", steering_strength=7.0, device="cpu")

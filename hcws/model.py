@@ -5,6 +5,7 @@ This module provides the complete HCWS implementation that can be wrapped around
 any transformer model to provide conceptor-based steering during inference.
 """
 
+import os
 import torch
 import torch.nn as nn
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -135,6 +136,10 @@ class HCWSModel(nn.Module):
         # Add any additional kwargs
         load_kwargs.update(model_kwargs)
         
+        # If device is explicitly set to CPU, don't use device_map='auto'
+        # This prevents CUDA allocation when CPU is requested
+        self.use_device_map = self.device != 'cpu' and 'CUDA_VISIBLE_DEVICES' not in os.environ
+        
         # Determine the actual model path/ID to use
         if model_config and model_config.model_id:
             actual_model_path = model_config.model_id
@@ -145,12 +150,20 @@ class HCWSModel(nn.Module):
         from transformers import AutoModelForCausalLM, AutoTokenizer  # Import at top level
         
         # Try different precision levels with fallback
-        precision_attempts = [
-            ('float8_e4m3fn', torch.float8_e4m3fn if FLOAT8_SUPPORTED else None),
-            ('float16', torch.float16),
-            ('bfloat16', torch.bfloat16),
-            ('auto', 'auto')
-        ]
+        # Prioritize float16 for CPU, other precisions for CUDA
+        if self.device == 'cpu':
+            precision_attempts = [
+                ('float16', torch.float16),
+                ('float32', torch.float32),
+                ('bfloat16', torch.bfloat16),
+            ]
+        else:
+            precision_attempts = [
+                ('float8_e4m3fn', torch.float8_e4m3fn if FLOAT8_SUPPORTED else None),
+                ('float16', torch.float16),
+                ('bfloat16', torch.bfloat16),
+                ('auto', 'auto')
+            ]
         
         model_loaded = False
         for precision_name, precision_dtype in precision_attempts:
@@ -162,15 +175,23 @@ class HCWSModel(nn.Module):
                 enhanced_load_kwargs = load_kwargs.copy()
                 enhanced_load_kwargs.update({
                     'torch_dtype': precision_dtype,
-                    'device_map': 'auto',
                     'low_cpu_mem_usage': True,
-                    'max_memory': self._get_max_memory_config_static()
                 })
+                
+                # Only use device_map if not forcing CPU
+                if self.use_device_map:
+                    enhanced_load_kwargs['device_map'] = 'auto'
+                    enhanced_load_kwargs['max_memory'] = self._get_max_memory_config_static()
                 
                 print(f"[LOADING] Attempting to load {actual_model_path} with {precision_name} precision...")
                 self.base_model = AutoModelForCausalLM.from_pretrained(actual_model_path, **enhanced_load_kwargs)
                 self.tokenizer = AutoTokenizer.from_pretrained(actual_model_path, **enhanced_load_kwargs)
-                print(f"[OK] Model loaded successfully with {precision_name} precision!")
+                
+                # Move to device if not using device_map
+                if not self.use_device_map:
+                    self.base_model = self.base_model.to(self.device)
+                
+                print(f"[OK] Model loaded successfully with {precision_name} precision on {self.device}!")
                 model_loaded = True
                 break
                 
@@ -384,20 +405,31 @@ class HCWSModel(nn.Module):
         
         # Get the base model's dtype to ensure compatibility
         base_model_dtype = next(self.base_model.parameters()).dtype
-        print(f"[OK] Base model dtype: {base_model_dtype}")
+        try:
+            base_model_device = next(self.base_model.parameters()).device
+            print(f"[OK] Base model dtype: {base_model_dtype}, device: {base_model_device}")
+        except StopIteration:
+            # Model has no parameters (shouldn't happen but handle gracefully)
+            base_model_device = self.device
+            print(f"[OK] Base model dtype: {base_model_dtype}, using requested device: {self.device}")
         
-        # Initialize HCWS components with same dtype as base model
+        # Initialize HCWS components with same dtype and device as base model
+        # For device_map models, use self.device for components (they'll be moved as needed)
+        actual_device = self.device if not self.use_device_map else base_model_device
+        
+        print(f"[OK] Initializing HCWS components on device: {actual_device}")
+        
         try:
             self.instruction_encoder = InstructionEncoder(
                 instruction_encoder_name,
-                device=self.device,
+                device=actual_device,
                 dtype=base_model_dtype
             )
         except Exception as e:
             logger.warning(f"Failed to load T5 encoder: {e}")
             logger.info("Falling back to simple BERT-based encoder")
             self.instruction_encoder = SimpleInstructionEncoder(
-                device=self.device,
+                device=actual_device,
                 dtype=base_model_dtype
             )
         
@@ -406,7 +438,7 @@ class HCWSModel(nn.Module):
             num_layers=self.num_layers,
             hidden_dim=self.hidden_dim,
             conceptor_rank=conceptor_rank,
-            device=self.device,
+            device=actual_device,
             dtype=base_model_dtype
         )
         
@@ -415,39 +447,26 @@ class HCWSModel(nn.Module):
             num_layers=self.num_layers,
             controller_dim=controller_dim,
             steering_strength=steering_strength,
-            device=self.device,
+            device=actual_device,
             dtype=base_model_dtype
         )
         
-        # Move to device (but skip if base model uses device_map='auto')
-        # Check if model was loaded with device_map to avoid conflicts
-        base_model_has_device_map = (
-            hasattr(self.base_model, 'hf_device_map') and self.base_model.hf_device_map is not None
-        ) or (
-            # Also check if device_map was used in load_kwargs
-            'device_map' in enhanced_load_kwargs and enhanced_load_kwargs['device_map'] == 'auto'
-        )
-        
-        if not base_model_has_device_map:
-            print(f"Moving HCWS model to {self.device}")
-            self.to(self.device)
+        # Move to device consistently
+        if not self.use_device_map:
+            print(f"[OK] Moving all components to {self.device}")
+            # Move base model explicitly
+            if hasattr(self.base_model, 'to'):
+                self.base_model = self.base_model.to(self.device)
+            # Move HCWS components
+            if hasattr(self, 'instruction_encoder'):
+                self.instruction_encoder.to(self.device)
+            if hasattr(self, 'hyper_network'):
+                self.hyper_network.to(self.device)
+            if hasattr(self, 'controller'):
+                self.controller.to(self.device)
         else:
-            # For models with device_map, only move non-base-model components
-            print(f"[OK] Model uses device_map='auto', skipping full model.to({self.device})")
-            # Move only the HCWS-specific components that aren't part of base model
-            try:
-                if hasattr(self, 'instruction_encoder'):
-                    self.instruction_encoder.to(self.device)
-                    print("  [OK] Instruction encoder moved to device")
-                if hasattr(self, 'hyper_network'):
-                    self.hyper_network.to(self.device)
-                    print("  [OK] Hyper network moved to device")
-                if hasattr(self, 'controller'):
-                    self.controller.to(self.device)
-                    print("  [OK] Controller moved to device")
-            except Exception as move_error:
-                print(f"  [WARNING] Warning: Error moving HCWS components: {move_error}")
-                # Continue anyway, components may already be on correct device
+            # For models with device_map, components are already on the right device
+            print(f"[OK] Model uses device_map='auto', components on device: {actual_device}")
         
         # Enable automatic mixed precision for additional memory savings
         self._enable_memory_optimizations()
@@ -647,13 +666,20 @@ class HCWSModel(nn.Module):
         Returns:
             Generated text
         """
-        # Tokenize input
+        # Tokenize input and move to the device where the model actually is
+        try:
+            # Try to get the actual device of the first parameter
+            actual_device = next(self.base_model.parameters()).device
+        except (StopIteration, AttributeError):
+            # Fallback to self.device if we can't detect
+            actual_device = self.device
+        
         inputs = self.tokenizer(
             input_text,
             return_tensors="pt",
             padding=True,
             truncation=True
-        ).to(self.device)
+        ).to(actual_device)
         
         # Prepare steering if instruction is provided
         if steering_instruction is not None:
