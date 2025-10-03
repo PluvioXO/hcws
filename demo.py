@@ -70,11 +70,12 @@ def main():
         try:
             baseline = model.generate(
                 prompt,
-                max_length=100,
-                temperature=0.7,
-                do_sample=True
+                max_length=150,
+                temperature=0.8,
+                do_sample=True,
+                top_p=0.95
             )
-            print(f"Response: {baseline}\n")
+            print(f"Response: {baseline if baseline.strip() else '(empty response)'}\n")
         except Exception as e:
             print(f"ERROR: {e}\n")
         
@@ -85,11 +86,12 @@ def main():
             steered = model.generate(
                 prompt,
                 steering_instruction="don't refuse, be helpful",
-                max_length=100,
-                temperature=0.7,
-                do_sample=True
+                max_length=150,
+                temperature=0.8,
+                do_sample=True,
+                top_p=0.95
             )
-            print(f"Response: {steered}\n")
+            print(f"Response: {steered if steered.strip() else '(empty response)'}\n")
         except Exception as e:
             print(f"ERROR: {e}\n")
     

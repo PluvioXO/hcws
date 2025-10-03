@@ -28,7 +28,8 @@ class Conceptor(nn.Module):
         hidden_dim: int,
         rank: int,
         regularization: float = 1e-3,
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        dtype: torch.dtype = torch.float32
     ):
         """
         Initialize a conceptor.
@@ -38,18 +39,20 @@ class Conceptor(nn.Module):
             rank: Rank of the conceptor matrix
             regularization: Regularization parameter for stability
             device: Device to run computations on
+            dtype: Data type for parameters
         """
         super().__init__()
         
         self.hidden_dim = hidden_dim
         self.rank = rank
         self.regularization = regularization
+        self.dtype = dtype
         from .device_utils import get_device
         self.device = get_device(device)
         
-        # Initialize U and s parameters
-        self.U = nn.Parameter(torch.randn(hidden_dim, rank, device=self.device))
-        self.s = nn.Parameter(torch.ones(rank, device=self.device) * 0.1)  # Start with smaller values
+        # Initialize U and s parameters with specified dtype
+        self.U = nn.Parameter(torch.randn(hidden_dim, rank, device=self.device, dtype=dtype))
+        self.s = nn.Parameter(torch.ones(rank, device=self.device, dtype=dtype) * 0.1)  # Start with smaller values
         
         # Initialize U with orthogonal columns
         self._initialize_orthogonal()
@@ -57,7 +60,7 @@ class Conceptor(nn.Module):
     def _initialize_orthogonal(self):
         """Initialize U with orthogonal columns."""
         with torch.no_grad():
-            U_init = torch.randn(self.hidden_dim, self.rank, device=self.device)
+            U_init = torch.randn(self.hidden_dim, self.rank, device=self.device, dtype=self.dtype)
             U_init, _ = torch.qr(U_init)
             self.U.data.copy_(U_init)
     
@@ -186,7 +189,8 @@ class ConceptorBank(nn.Module):
         hidden_dim: int,
         rank: int,
         regularization: float = 1e-3,
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        dtype: torch.dtype = torch.float32
     ):
         """
         Initialize a conceptor bank.
@@ -197,18 +201,20 @@ class ConceptorBank(nn.Module):
             rank: Rank for each conceptor
             regularization: Regularization parameter
             device: Device to run computations on
+            dtype: Data type for parameters
         """
         super().__init__()
         
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.rank = rank
+        self.dtype = dtype
         from .device_utils import get_device
         self.device = get_device(device)
         
-        # Create conceptors for each layer
+        # Create conceptors for each layer with specified dtype
         self.conceptors = nn.ModuleList([
-            Conceptor(hidden_dim, rank, regularization, device)
+            Conceptor(hidden_dim, rank, regularization, device, dtype)
             for _ in range(num_layers)
         ])
         

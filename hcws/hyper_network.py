@@ -120,6 +120,11 @@ class HyperNetwork(nn.Module):
         """
         batch_size = instruction_embedding.shape[0]
         
+        # Convert input to hyper-network's dtype
+        original_dtype = instruction_embedding.dtype
+        if instruction_embedding.dtype != self.dtype:
+            instruction_embedding = instruction_embedding.to(self.dtype)
+        
         # Generate parameters for each layer
         U_params = torch.zeros(
             batch_size, self.num_layers, self.hidden_dim, self.conceptor_rank,
@@ -153,6 +158,11 @@ class HyperNetwork(nn.Module):
             s_raw = self.s_head(hidden)
             s_params[:, layer_idx] = torch.sigmoid(s_raw)  # Ensure s ∈ [0, 1]
         
+        # Convert back to original dtype if needed
+        if original_dtype != self.dtype:
+            U_params = U_params.to(original_dtype)
+            s_params = s_params.to(original_dtype)
+        
         return {
             'U': U_params,
             's': s_params
@@ -181,13 +191,14 @@ class HyperNetwork(nn.Module):
         U_params = params['U'][0]  # Take first batch element
         s_params = params['s'][0]
         
-        # Create conceptor bank
+        # Create conceptor bank with matching dtype
         bank = ConceptorBank(
             self.num_layers,
             self.hidden_dim,
             self.conceptor_rank,
             regularization,
-            self.device
+            self.device,
+            self.dtype
         )
         
         # Set generated parameters
@@ -199,8 +210,16 @@ class HyperNetwork(nn.Module):
                 U_layer = U_params[layer_idx]
                 U_ortho, _ = torch.qr(U_layer)
                 
+                # Ensure dtype matches before copying
+                if U_ortho.dtype != conceptor.U.dtype:
+                    U_ortho = U_ortho.to(conceptor.U.dtype)
+                if s_params[layer_idx].dtype != conceptor.s.dtype:
+                    s_params_layer = s_params[layer_idx].to(conceptor.s.dtype)
+                else:
+                    s_params_layer = s_params[layer_idx]
+                
                 conceptor.U.data.copy_(U_ortho)
-                conceptor.s.data.copy_(s_params[layer_idx])
+                conceptor.s.data.copy_(s_params_layer)
         
         return bank
     
