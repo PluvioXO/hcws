@@ -60,8 +60,13 @@ class Conceptor(nn.Module):
     def _initialize_orthogonal(self):
         """Initialize U with orthogonal columns."""
         with torch.no_grad():
-            U_init = torch.randn(self.hidden_dim, self.rank, device=self.device, dtype=self.dtype)
+            # Use float32 for QR decomposition on CPU (geqrf_cpu doesn't support float16)
+            compute_dtype = torch.float32 if self.device.type == 'cpu' and self.dtype == torch.float16 else self.dtype
+            U_init = torch.randn(self.hidden_dim, self.rank, device=self.device, dtype=compute_dtype)
             U_init, _ = torch.qr(U_init)
+            # Convert back to target dtype if needed
+            if compute_dtype != self.dtype:
+                U_init = U_init.to(self.dtype)
             self.U.data.copy_(U_init)
     
     def get_matrix(self) -> torch.Tensor:
@@ -71,14 +76,25 @@ class Conceptor(nn.Module):
         Returns:
             Conceptor matrix [hidden_dim, hidden_dim]
         """
+        # Use float32 for QR decomposition on CPU (geqrf_cpu doesn't support float16)
+        compute_dtype = torch.float32 if self.device.type == 'cpu' and self.U.dtype == torch.float16 else self.U.dtype
+        
+        # Convert to compute dtype if needed
+        U_compute = self.U.to(compute_dtype) if compute_dtype != self.U.dtype else self.U
+        
         # Ensure U has orthogonal columns
-        U_normalized, _ = torch.qr(self.U)
+        U_normalized, _ = torch.qr(U_compute)
         
         # Clamp singular values to ensure stability and reduce aperture
-        s_clamped = torch.clamp(self.s, min=0.0, max=0.5)  # Reduced from 1.0 to 0.5
+        s_compute = self.s.to(compute_dtype) if compute_dtype != self.s.dtype else self.s
+        s_clamped = torch.clamp(s_compute, min=0.0, max=0.5)  # Reduced from 1.0 to 0.5
         
         # Compute C = U diag(s) U^T
         C = torch.mm(U_normalized * s_clamped.unsqueeze(0), U_normalized.t())
+        
+        # Convert back to original dtype if needed
+        if compute_dtype != self.U.dtype:
+            C = C.to(self.U.dtype)
         
         return C
     

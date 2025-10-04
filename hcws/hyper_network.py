@@ -206,9 +206,11 @@ class HyperNetwork(nn.Module):
             for layer_idx in range(self.num_layers):
                 conceptor = bank.get_conceptor(layer_idx)
                 
-                # Orthogonalize U
+                # Orthogonalize U (use float32 for CPU if needed)
                 U_layer = U_params[layer_idx]
-                U_ortho, _ = torch.qr(U_layer)
+                compute_dtype = torch.float32 if self.device.type == 'cpu' and U_layer.dtype == torch.float16 else U_layer.dtype
+                U_compute = U_layer.to(compute_dtype) if compute_dtype != U_layer.dtype else U_layer
+                U_ortho, _ = torch.qr(U_compute)
                 
                 # Ensure dtype matches before copying
                 if U_ortho.dtype != conceptor.U.dtype:
@@ -260,8 +262,15 @@ class HyperNetwork(nn.Module):
         U = u_flat.view(1, self.hidden_dim, self.conceptor_rank)[0]
         s = torch.sigmoid(self.s_head(hidden))[0]
         
-        # Orthogonalize U
-        U_ortho, _ = torch.qr(U)
+        # Orthogonalize U (use float32 for CPU if needed)
+        compute_dtype = torch.float32 if self.device.type == 'cpu' and U.dtype == torch.float16 else U.dtype
+        U_compute = U.to(compute_dtype) if compute_dtype != U.dtype else U
+        U_ortho, _ = torch.qr(U_compute)
+        
+        # Convert back if needed
+        if compute_dtype != U.dtype:
+            U_ortho = U_ortho.to(U.dtype)
+            s = s.to(U.dtype) if s.dtype != U.dtype else s
         
         # Compute conceptor matrix C = U diag(s) U^T
         C = torch.mm(U_ortho * s.unsqueeze(0), U_ortho.t())
