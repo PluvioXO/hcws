@@ -48,7 +48,13 @@ class Conceptor(nn.Module):
         self.regularization = regularization
         self.dtype = dtype
         from .device_utils import get_device
-        self.device = get_device(device)
+        raw_device = get_device(device)
+        
+        # Convert to torch.device for consistent handling
+        if isinstance(raw_device, str):
+            self.device = torch.device(raw_device)
+        else:
+            self.device = raw_device
         
         # Initialize U and s parameters with specified dtype
         self.U = nn.Parameter(torch.randn(hidden_dim, rank, device=self.device, dtype=dtype))
@@ -226,7 +232,13 @@ class ConceptorBank(nn.Module):
         self.rank = rank
         self.dtype = dtype
         from .device_utils import get_device
-        self.device = get_device(device)
+        raw_device = get_device(device)
+        
+        # Convert to torch.device for consistent handling
+        if isinstance(raw_device, str):
+            self.device = torch.device(raw_device)
+        else:
+            self.device = raw_device
         
         # Create conceptors for each layer with specified dtype
         self.conceptors = nn.ModuleList([

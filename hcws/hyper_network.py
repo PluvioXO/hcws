@@ -62,7 +62,13 @@ class HyperNetwork(nn.Module):
         self.use_layer_embedding = use_layer_embedding
         self.dtype = dtype
         from .device_utils import get_device
-        self.device = get_device(device)
+        raw_device = get_device(device)
+        
+        # Convert to torch.device for consistent handling
+        if isinstance(raw_device, str):
+            self.device = torch.device(raw_device)
+        else:
+            self.device = raw_device
         
         # Layer embeddings for layer-specific generation
         if use_layer_embedding:

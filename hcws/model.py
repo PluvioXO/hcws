@@ -101,7 +101,15 @@ class HCWSModel(nn.Module):
         super().__init__()
         
         from .device_utils import get_device
-        self.device = get_device(device)
+        raw_device = get_device(device)
+        
+        # Convert to torch.device for consistent handling
+        # get_device() returns either string or torch.device (for TPU)
+        if isinstance(raw_device, str):
+            self.device = torch.device(raw_device)
+        else:
+            self.device = raw_device
+        
         self.hook_frequency = hook_frequency
         
         # Detect or use provided model configuration
@@ -138,7 +146,7 @@ class HCWSModel(nn.Module):
         
         # If device is explicitly set to CPU, don't use device_map='auto'
         # This prevents CUDA allocation when CPU is requested
-        self.use_device_map = self.device != 'cpu' and 'CUDA_VISIBLE_DEVICES' not in os.environ
+        self.use_device_map = self.device.type != 'cpu' and 'CUDA_VISIBLE_DEVICES' not in os.environ
         
         # Determine the actual model path/ID to use
         if model_config and model_config.model_id:
@@ -151,7 +159,7 @@ class HCWSModel(nn.Module):
         
         # Try different precision levels with fallback
         # Prioritize float16 for CPU, other precisions for CUDA
-        if self.device == 'cpu':
+        if self.device.type == 'cpu':
             precision_attempts = [
                 ('float16', torch.float16),
                 ('float32', torch.float32),

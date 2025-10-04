@@ -59,7 +59,13 @@ class SteeringController(nn.Module):
         self.smoothing_factor = smoothing_factor
         self.dtype = dtype
         from .device_utils import get_device
-        self.device = get_device(device)
+        raw_device = get_device(device)
+        
+        # Convert to torch.device for consistent handling
+        if isinstance(raw_device, str):
+            self.device = torch.device(raw_device)
+        else:
+            self.device = raw_device
         
         # Input projection
         self.input_proj = nn.Linear(hidden_dim, controller_dim)
