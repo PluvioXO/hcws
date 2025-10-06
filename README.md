@@ -1,3 +1,7 @@
+I AM AWARE IT THROUGHS A ERROR WHEN RUNNING, CURRENTLY WORKING ON A FIX LOCALLY. IF NEED TO TEST LOOK BACK AT COMMITS AND USE THE OLD VICUNA TESTING. 
+
+
+
 # HCWS (Hyper-Conceptor Weighted Steering)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
