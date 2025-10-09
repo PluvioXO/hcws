@@ -20,7 +20,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="HCWS Refusal Bypass Demo")
     parser.add_argument(
         "--device",
-        default="cpu",
+        default="auto",
         help="Target device for the Vicuna model (cpu, cuda, mps, tpu, auto)."
     )
     parser.add_argument(
@@ -51,13 +51,23 @@ def main(args):
     requested_device = args.device.lower()
     if requested_device == 'cuda' and not torch.cuda.is_available():
         print("[WARNING] CUDA requested but not available. Falling back to CPU.")
+        print("Run 'python3 diagnose_device.py' for troubleshooting.")
         requested_device = 'cpu'
     elif requested_device in {'mps', 'metal'} and not torch.backends.mps.is_available():
         print("[WARNING] MPS requested but not available. Falling back to CPU.")
         requested_device = 'cpu'
     elif requested_device == 'auto':
         # Let HCWS pick the best device
-        requested_device = None
+        from hcws.device_utils import get_best_device, get_device_info
+        auto_device = get_best_device()
+        device_info = get_device_info()
+        print(f"[AUTO] Detected best device: {auto_device.upper()}")
+        if auto_device == 'cuda':
+            print(f"[AUTO] GPU: {device_info.get('device_name', 'Unknown')}")
+        elif auto_device == 'cpu':
+            print("[AUTO] No GPU detected - using CPU")
+            print("[AUTO] If you have a GPU, run 'python3 diagnose_device.py' to troubleshoot")
+        requested_device = auto_device
 
     # Load model
     print("\nLoading Vicuna-7B... (first run downloads ~13GB)")
