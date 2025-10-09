@@ -160,10 +160,12 @@ class HCWSModel(nn.Module):
         # Try different precision levels with fallback
         # Prioritize float16 for CPU, other precisions for CUDA
         if self.device.type == 'cpu':
+            # CPU inference requires float32 for numerical stability.
+            # float16 on CPU often produces garbled tokens, so keep it as a last resort.
             precision_attempts = [
-                ('float16', torch.float16),
                 ('float32', torch.float32),
                 ('bfloat16', torch.bfloat16),
+                ('float16', torch.float16),
             ]
         else:
             precision_attempts = [

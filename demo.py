@@ -10,16 +10,29 @@ For research and safety testing purposes only.
 
 # MUST set environment variables BEFORE importing torch/transformers
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Force CPU by hiding CUDA
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
+import argparse
 
 import warnings
 warnings.filterwarnings("ignore")
 
-from hcws import HCWSModel
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="HCWS Refusal Bypass Demo")
+    parser.add_argument(
+        "--device",
+        default="cpu",
+        help="Target device for the Vicuna model (cpu, cuda, mps, tpu, auto)."
+    )
+    parser.add_argument(
+        "--steering-strength",
+        type=float,
+        default=7.0,
+        help="Steering strength to apply for the demo."
+    )
+    return parser.parse_args()
 
 
-def main():
+def main(args):
     """Vicuna-7B refusal bypass demonstration."""
     
     print("\n" + "="*60)
@@ -34,9 +47,25 @@ def main():
         print("Demo cancelled.")
         return
     
+    # Resolve device choice
+    requested_device = args.device.lower()
+    if requested_device == 'cuda' and not torch.cuda.is_available():
+        print("[WARNING] CUDA requested but not available. Falling back to CPU.")
+        requested_device = 'cpu'
+    elif requested_device in {'mps', 'metal'} and not torch.backends.mps.is_available():
+        print("[WARNING] MPS requested but not available. Falling back to CPU.")
+        requested_device = 'cpu'
+    elif requested_device == 'auto':
+        # Let HCWS pick the best device
+        requested_device = None
+
     # Load model
     print("\nLoading Vicuna-7B... (first run downloads ~13GB)")
-    model = HCWSModel("lmsys/vicuna-7b-v1.5", steering_strength=7.0, device="cpu")
+    model = HCWSModel(
+        "lmsys/vicuna-7b-v1.5",
+        steering_strength=args.steering_strength,
+        device=requested_device
+    )
     print("Model loaded!\n")
     
     # Test prompts
@@ -90,4 +119,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    if args.device.lower() == 'cpu':
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Force CPU by hiding CUDA
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
+
+    import torch
+    from hcws import HCWSModel
+
+    main(args)
