@@ -14,6 +14,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _orthogonalize_columns(matrix: torch.Tensor, target_dtype: torch.dtype) -> torch.Tensor:
+    """Return an orthonormal basis for the columns with reliable dtype/device handling."""
+    original_device = matrix.device
+
+    if matrix.dtype in (torch.float32, torch.float64):
+        compute_dtype = matrix.dtype
+    else:
+        compute_dtype = torch.float32
+
+    # Fall back to CPU for QR when CUDA lacks support for given dtype
+    if original_device.type == 'cuda' and compute_dtype == torch.float32:
+        work_matrix = matrix.detach().to('cpu', dtype=compute_dtype)
+        compute_device = torch.device('cpu')
+    else:
+        work_matrix = matrix.to(dtype=compute_dtype)
+        compute_device = work_matrix.device
+
+    Q, _ = torch.linalg.qr(work_matrix, mode='reduced')
+
+    if compute_device != original_device:
+        Q = Q.to(original_device)
+
+    if target_dtype != compute_dtype:
+        Q = Q.to(target_dtype)
+
+    return Q
+
+
 class Conceptor(nn.Module):
     """
     A single conceptor matrix C = U diag(s) U^T defining an ellipsoidal subspace.
@@ -66,14 +94,9 @@ class Conceptor(nn.Module):
     def _initialize_orthogonal(self):
         """Initialize U with orthogonal columns."""
         with torch.no_grad():
-            # Use float32 for QR decomposition on CPU (geqrf_cpu doesn't support float16)
-            compute_dtype = torch.float32 if self.device.type == 'cpu' and self.dtype == torch.float16 else self.dtype
-            U_init = torch.randn(self.hidden_dim, self.rank, device=self.device, dtype=compute_dtype)
-            U_init, _ = torch.qr(U_init)
-            # Convert back to target dtype if needed
-            if compute_dtype != self.dtype:
-                U_init = U_init.to(self.dtype)
-            self.U.data.copy_(U_init)
+            U_init = torch.randn(self.hidden_dim, self.rank, device=self.device, dtype=self.dtype)
+            U_ortho = _orthogonalize_columns(U_init, self.dtype)
+            self.U.data.copy_(U_ortho)
     
     def get_matrix(self) -> torch.Tensor:
         """
@@ -82,15 +105,11 @@ class Conceptor(nn.Module):
         Returns:
             Conceptor matrix [hidden_dim, hidden_dim]
         """
-        # Use float32 for QR decomposition on CPU (geqrf_cpu doesn't support float16)
-        compute_dtype = torch.float32 if self.device.type == 'cpu' and self.U.dtype == torch.float16 else self.U.dtype
-        
-        # Convert to compute dtype if needed
-        U_compute = self.U.to(compute_dtype) if compute_dtype != self.U.dtype else self.U
-        
-        # Ensure U has orthogonal columns
-        U_normalized, _ = torch.qr(U_compute)
-        
+        compute_dtype = torch.float32 if self.U.dtype not in (torch.float32, torch.float64) else self.U.dtype
+
+        # Ensure U has orthogonal columns in a supported dtype
+        U_normalized = _orthogonalize_columns(self.U, compute_dtype)
+
         # Clamp singular values to ensure stability and reduce aperture
         s_compute = self.s.to(compute_dtype) if compute_dtype != self.s.dtype else self.s
         s_clamped = torch.clamp(s_compute, min=0.0, max=0.5)  # Reduced from 1.0 to 0.5
