@@ -230,7 +230,6 @@ class HCWSModel(nn.Module):
                     try:
                         import subprocess
                         import sys
-                        import os
                         
                         print("Installing bleeding-edge transformers with GPT-OSS support...")
                         
