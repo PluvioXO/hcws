@@ -102,8 +102,8 @@ class SteeringController(nn.Module):
         # Initialize weights
         self._initialize_weights()
         
-        # Convert to specified dtype for memory savings
-        self.to(dtype=dtype)
+        # Move controller to the requested device/dtype
+        self.to(self.device, dtype=dtype)
         
         logger.info(f"Initialized SteeringController with {num_layers} layers")
         logger.info(f"Using dtype: {dtype}")

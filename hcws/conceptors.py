@@ -242,9 +242,12 @@ class ConceptorBank(nn.Module):
         
         # Create conceptors for each layer with specified dtype
         self.conceptors = nn.ModuleList([
-            Conceptor(hidden_dim, rank, regularization, device, dtype)
+            Conceptor(hidden_dim, rank, regularization, self.device, dtype)
             for _ in range(num_layers)
         ])
+
+        # Ensure entire bank is on the desired device/dtype
+        self.to(self.device, dtype=dtype)
         
         logger.info(f"Initialized ConceptorBank with {num_layers} layers")
     

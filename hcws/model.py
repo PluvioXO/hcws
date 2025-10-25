@@ -543,12 +543,24 @@ class HCWSModel(nn.Module):
             # Get hidden states
             if isinstance(output, tuple):
                 hidden_states = output[0]
+                other_outputs = output[1:]
             else:
                 hidden_states = output
+                other_outputs = None
+            
+            steering_device = self._get_steering_device()
+            working_hidden_states = hidden_states
+            moved_to_controller = False
+            if steering_device is not None and hidden_states.device != steering_device:
+                working_hidden_states = hidden_states.to(steering_device)
+                moved_to_controller = True
+            
+            if steering_device is not None:
+                self._ensure_conceptor_bank_device(steering_device)
             
             # Get steering parameters from controller
             gain, layer_weights = self.controller(
-                hidden_states,
+                working_hidden_states,
                 layer_idx
             )
             
@@ -559,10 +571,10 @@ class HCWSModel(nn.Module):
             conceptor = self.current_conceptor_bank.get_conceptor(layer_idx)
             
             # Implement: h'_{t,ℓ} = h_{t,ℓ} - g_t * w_{ℓ,t} * C_ℓ * h_{t,ℓ}
-            batch_size, seq_len, hidden_dim = hidden_states.shape
+            batch_size, seq_len, hidden_dim = working_hidden_states.shape
             
             # Apply steering to the last token (current generation step)
-            current_activation = hidden_states[:, -1:, :]  # [batch_size, 1, hidden_dim]
+            current_activation = working_hidden_states[:, -1:, :]  # [batch_size, 1, hidden_dim]
             
             # Contract activation toward conceptor subspace
             steering_strength = gain * layer_weight.unsqueeze(1)  # [batch_size, 1]
@@ -572,14 +584,16 @@ class HCWSModel(nn.Module):
             )
             
             # Replace the last token's activation
-            modified_hidden_states = hidden_states.clone()
+            modified_hidden_states = working_hidden_states.clone()
             modified_hidden_states[:, -1:, :] = contracted_activation
             
+            if moved_to_controller:
+                modified_hidden_states = modified_hidden_states.to(hidden_states.device)
+            
             # Return modified output
-            if isinstance(output, tuple):
-                return (modified_hidden_states,) + output[1:]
-            else:
-                return modified_hidden_states
+            if other_outputs is not None:
+                return (modified_hidden_states,) + other_outputs
+            return modified_hidden_states
         
         return hook_fn
     
@@ -604,6 +618,32 @@ class HCWSModel(nn.Module):
                     # Ignore errors when removing hooks
                     pass
             self.hooks = []
+
+    def _get_steering_device(self) -> torch.device:
+        """Determine the device where steering components reside."""
+        if hasattr(self.controller, 'device') and self.controller.device is not None:
+            controller_device = self.controller.device
+            if isinstance(controller_device, torch.device):
+                return controller_device
+            return torch.device(controller_device)
+        try:
+            return next(self.controller.parameters()).device
+        except (StopIteration, AttributeError):
+            return self.device
+
+    def _ensure_conceptor_bank_device(self, target_device: Optional[torch.device]):
+        """Move the current conceptor bank (and its conceptors) to the target device."""
+        if self.current_conceptor_bank is None or target_device is None:
+            return
+        if not isinstance(target_device, torch.device):
+            target_device = torch.device(target_device)
+        self.current_conceptor_bank.to(target_device)
+        if hasattr(self.current_conceptor_bank, 'device'):
+            self.current_conceptor_bank.device = target_device
+        for conceptor in getattr(self.current_conceptor_bank, 'conceptors', []):
+            conceptor.to(target_device)
+            if hasattr(conceptor, 'device'):
+                conceptor.device = target_device
     
     def prepare_steering(self, instruction: str):
         """
@@ -619,6 +659,9 @@ class HCWSModel(nn.Module):
         self.current_conceptor_bank = self.hyper_network.generate_conceptor_bank(
             instruction_embedding.squeeze(0)
         )
+        steering_device = self._get_steering_device()
+        if steering_device is not None:
+            self._ensure_conceptor_bank_device(steering_device)
         
         # Reset controller state
         self.controller.reset_state()

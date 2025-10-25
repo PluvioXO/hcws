@@ -26,7 +26,7 @@ class TestConceptor:
         assert conceptor.hidden_dim == 128
         assert conceptor.rank == 16
         assert conceptor.regularization == 1e-3
-        assert conceptor.device == "cpu"
+        assert str(conceptor.device) == "cpu"
         assert conceptor.U.shape == (128, 16)
         assert conceptor.s.shape == (16,)
     

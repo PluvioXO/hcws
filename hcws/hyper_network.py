@@ -98,8 +98,8 @@ class HyperNetwork(nn.Module):
         # Initialize weights
         self._initialize_weights()
         
-        # Convert to specified dtype for memory savings
-        self.to(dtype=dtype)
+        # Move hyper-network to the requested device/dtype
+        self.to(self.device, dtype=dtype)
         
         logger.info(f"Initialized HyperNetwork with {num_layers} layers")
         logger.info(f"Conceptor rank: {conceptor_rank}, Hidden dim: {hidden_dim}")

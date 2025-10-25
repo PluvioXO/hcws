@@ -27,7 +27,7 @@ class TestInstructionEncoder:
         assert encoder.max_length == 128
         assert encoder.pooling == "mean"
         assert encoder.embedding_dim > 0
-        assert encoder.device == "cpu"
+        assert str(encoder.device) == "cpu"
     
     def test_tokenize_single_instruction(self, encoder):
         """Test tokenizing a single instruction."""
